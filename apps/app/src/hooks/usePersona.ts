@@ -25,6 +25,7 @@ export interface PersonaApi {
   updateProfile: (patch: Partial<PersonaProfile>) => Promise<void>;
   applyPreset: (presetId: string) => Promise<PersonaProfile | null>;
   applyCustom: (form: CustomPersonaForm) => Promise<PersonaProfile | null>;
+  replace: (profile: PersonaProfile) => void;
   historyCount: number;
   rollback: () => Promise<void>;
 }
@@ -138,6 +139,11 @@ export function usePersona(): PersonaApi {
     [persist, profile],
   );
 
+  const replace = useCallback((next: PersonaProfile) => {
+    setProfile(next);
+    if (isTauri()) void api.personaSave(next).catch(() => undefined);
+  }, []);
+
   const applyPreset = useCallback(
     async (presetId: string): Promise<PersonaProfile | null> => {
       const preset = findPersonaPreset(presetId);
@@ -191,5 +197,5 @@ export function usePersona(): PersonaApi {
     }
   }, [history]);
 
-  return { profile, ready, busy, message, buildFromImport, rebuildFromDb, updateFacts, updateProfile, applyPreset, applyCustom, historyCount: history.length, rollback };
+  return { profile, ready, busy, message, buildFromImport, rebuildFromDb, updateFacts, updateProfile, applyPreset, applyCustom, replace, historyCount: history.length, rollback };
 }

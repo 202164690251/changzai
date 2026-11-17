@@ -28,6 +28,7 @@ export interface RelationshipApi {
   message: string | null;
   save: (profile: RelationshipProfile) => Promise<void>;
   rebuild: () => Promise<void>;
+  replace: (profile: RelationshipProfile) => void;
 }
 
 export function useRelationship(herName: string, meName: string, dbReady = true): RelationshipApi {
@@ -56,6 +57,11 @@ export function useRelationship(herName: string, meName: string, dbReady = true)
     return () => {
       alive = false;
     };
+  }, []);
+
+  const replace = useCallback((next: RelationshipProfile) => {
+    setProfile(next);
+    if (isTauri()) void api.settingSet(SETTING_KEY, JSON.stringify(next)).catch(() => undefined);
   }, []);
 
   const save = useCallback(async (next: RelationshipProfile): Promise<void> => {
@@ -99,5 +105,5 @@ export function useRelationship(herName: string, meName: string, dbReady = true)
     void rebuild();
   }, [busy, dbReady, profile, ready, rebuild]);
 
-  return { profile, ready, busy, message, save, rebuild };
+  return { profile, ready, busy, message, save, rebuild, replace };
 }
