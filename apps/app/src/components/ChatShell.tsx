@@ -53,7 +53,7 @@ export function ChatShell(): ReactElement {
   const meName = displayName(profile.me, "我");
   const relationship = useRelationship(herName, meName, db.ready);
   const styleFeedback = useStyleFeedback();
-  const { messages, typing, unread, sendText, sendImage, appendImported, appendProactive, recallLastMessage, deleteMessage, clear, markRead } = useChat({
+  const { messages, typing, unread, sendText, sendImage, appendImported, appendProactive, resetToGreeting, recallLastMessage, deleteMessage, clear, markRead } = useChat({
     persona: persona.profile,
     llm: llm.config,
     herName,
@@ -104,7 +104,7 @@ export function ChatShell(): ReactElement {
       setPersonaStartOpen(false);
       show(`已用「${preset.label}」创建人格，可以开始聊天了`);
     },
-    [appendProactive, clear, markRead, meName, onboarding, persona, relationship, show],
+    [meName, onboarding, persona, relationship, resetToGreeting, show],
   );
 
   const handleCreateCustom = useCallback(
@@ -119,7 +119,7 @@ export function ChatShell(): ReactElement {
       setPersonaStartOpen(false);
       show("自定义人格已创建，可以开始聊天了");
     },
-    [appendProactive, clear, markRead, meName, onboarding, persona, relationship, show],
+    [meName, onboarding, persona, relationship, resetToGreeting, show],
   );
   const importer = useImport(async (result) => {
     await db.refresh();
