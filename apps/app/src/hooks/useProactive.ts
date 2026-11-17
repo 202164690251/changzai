@@ -3,18 +3,20 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   DEFAULT_PROACTIVE_STATE,
+  applyProactivePreset,
   buildSystemPrompt,
   filterAiFlavor,
   planProactive,
   recordProactiveSent,
   type PersonaProfile,
+  type ProactiveDesire,
   type ProactiveState,
 } from "@changzai/core";
 import { isPermissionGranted, requestPermission, sendNotification } from "@tauri-apps/plugin-notification";
 import { api, isTauri, type LlmConfig } from "../lib/tauri.ts";
 
 const SETTING_KEY = "proactive.state";
-const CHECK_INTERVAL_MS = 90_000;
+
 
 export interface ProactiveOptions {
   persona: PersonaProfile | null;
@@ -31,6 +33,8 @@ export interface ProactiveApi {
   busy: boolean;
   planReason: string;
   setEnabled: (enabled: boolean) => void;
+  setDesire: (level: ProactiveDesire) => void;
+  updateSettings: (patch: Partial<ProactiveState>) => void;
   test: () => Promise<void>;
 }
 
@@ -93,6 +97,29 @@ export function useProactive(options: ProactiveOptions): ProactiveApi {
     [persist],
   );
 
+  const setDesire = useCallback(
+    (level: ProactiveDesire) => {
+      persist(applyProactivePreset(stateRef.current, level));
+    },
+    [persist],
+  );
+
+  const updateSettings = useCallback(
+    (patch: Partial<ProactiveState>) => {
+      persist({ ...stateRef.current, ...patch });
+    },
+    [persist],
+  );
+
+  useEffect(() => {
+    if (options.lastUserAt <= 0) return;
+    persist({
+      ...stateRef.current,
+      lastUserAt: options.lastUserAt,
+      consecutiveNoReply: 0,
+    });
+  }, [options.lastUserAt, persist]);
+
   const generate = useCallback(async (): Promise<void> => {
     if (busyRef.current) return;
     const { persona, llm, herName, meName, onMessage, onNotice } = optionsRef.current;
@@ -127,7 +154,12 @@ export function useProactive(options: ProactiveOptions): ProactiveApi {
       if (!text) return;
       onMessage(text);
       void notify(herName, text);
-      persist({ ...recordProactiveSent(stateRef.current, Date.now()), lastUserAt: Date.now() });
+      const now = Date.now();
+      persist({
+        ...recordProactiveSent(stateRef.current, now),
+        lastUserAt: now,
+        consecutiveNoReply: stateRef.current.consecutiveNoReply + 1,
+      });
     } catch (err) {
       onNotice(err instanceof Error ? err.message : String(err));
     } finally {
@@ -148,9 +180,9 @@ export function useProactive(options: ProactiveOptions): ProactiveApi {
       const plan = planProactive({ ...current, lastUserAt }, Date.now());
       setPlanReason(plan.reason);
       if (plan.shouldSend) void generate();
-    }, CHECK_INTERVAL_MS);
+    }, Math.max(1, state.checkIntervalMinutes) * 60_000);
     return () => window.clearInterval(timer);
-  }, [generate, state.enabled]);
+  }, [generate, state.checkIntervalMinutes, state.enabled]);
 
-  return { state, busy, planReason, setEnabled, test };
+  return { state, busy, planReason, setEnabled, setDesire, updateSettings, test };
 }
