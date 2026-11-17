@@ -95,7 +95,7 @@ powershell -ExecutionPolicy Bypass -File scripts\build.ps1   # Windows 安装包
 
 仓库地址：<https://github.com/202164690251/changzai>
 
-- **main 是保护分支**：不能直接 push，必须走 PR + 1 人 review + CI 全绿；
+- **main 约定为保护分支**：不直接 push，必须走 PR + 1 人 review + CI 全绿（GitHub 免费私有仓库暂不支持强制保护，升级 Pro 或公开后可一键开启）；
 - 每位成员一个功能分支：`feat/<scope>-<short>` / `fix/<scope>-<short>` / `docs/<short>`；
 - 详细流程、提交规范、邀请协作者、数据隐私红线：见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 

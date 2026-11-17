@@ -98,6 +98,11 @@ if ($opensslCandidates.Count -gt 0) {
     if ((Test-Path $opensslBin) -and (($env:PATH -split ';') -notcontains $opensslBin)) {
         $env:PATH = "$opensslBin;$env:PATH"
     }
+    # OPENSSL_LIB_DIR / OPENSSL_INCLUDE_DIR：兼容 choco 的 lib\VC\x64\MD 布局
+    $env:OPENSSL_INCLUDE_DIR = Join-Path $opensslDir 'include'
+    $libHit = Get-ChildItem $opensslDir -Recurse -Filter 'libcrypto.lib' -ErrorAction SilentlyContinue |
+        Select-Object -First 1
+    if ($libHit) { $env:OPENSSL_LIB_DIR = $libHit.DirectoryName } else { $env:OPENSSL_LIB_DIR = Join-Path $opensslDir 'lib' }
     $env:CHANGZAI_OPENSSL_DIR = $opensslDir
 } else {
     Write-Warning '未找到预编译 OpenSSL（sqlcipher-system 构建会失败）；可下载 FireDaemon OpenSSL 解压到 D:\tools\openssl 或安装 Win64 OpenSSL'

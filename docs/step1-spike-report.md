@@ -79,23 +79,28 @@ cargo test --lib --no-default-features --features sqlcipher-vendored
 | 2026-11-17 10:52 | ✅ 编译成功 | `Finished release profile in 35.82s`；exe 14,342,656 bytes（依赖已缓存后的增量构建） |
 | 2026-11-17 10:53 | ⚠️ 打包失败（环境网络） | NSIS 3.13 需从 GitHub release 资产下载，`tauri-bundler` 报 `timeout: global`；可执行文件本身已生成 |
 | 2026-11-17 11:02 | ✅ 打包成功 | 设置 `TAURI_BUNDLER_TOOLS_GITHUB_MIRROR=https://ghproxy.net/https://github.com` 后，NSIS 工具链与 WebView2 Bootstrapper 下载成功；产出 `Changzai_0.1.0_x64-setup.exe`（5.36 MiB） |
+| 2026-11-17 12:12 | ✅ 新 UI + SQLCipher 重新构建 | UI 重做（微信桌面版）后 release 构建 + NSIS 打包成功；安装包 5.49 MiB；`sqlcipher-system` 链接预编译 OpenSSL 3.5 |
 
-**产物**：
-- 可执行文件：`release/changzai.exe`（14.3MB，portable）
-- 安装包：`release/Changzai_0.1.0_x64-setup.exe`（5.36MB，含 WebView2 Bootstrapper，未签名）
-- 打包命令：`powershell -ExecutionPolicy Bypass -File scripts\build.ps1`（脚本已自动设置镜像）；后续接代码签名证书即可去掉 SmartScreen 警告。
+**产物**（`release/`，均为未签名内测版）：
+- `changzai.exe`（15.0MB，portable，需要同目录 OpenSSL DLL）
+- `Changzai_0.1.0_x64-setup.exe`（5.49MB，含 WebView2 Bootstrapper）
+- `libcrypto-3-x64.dll` / `libssl-3-x64.dll`（SQLCipher 运行库；portable 版必须与 exe 同目录）
+- `README-内测说明.txt`
+- 打包命令：`powershell -ExecutionPolicy Bypass -File scripts\build.ps1`（脚本已自动设置镜像与 `CARGO_TARGET_DIR`）；后续接代码签名证书即可去掉 SmartScreen 警告。
 
 > 说明：本机直连 GitHub release-assets 超时、curl 的 schannel 吊销检查离线；GitHub 代理镜像可用，已在 `scripts/build.ps1` 内置默认镜像，可用环境变量覆盖。
+> 安装包暂未打进两个 OpenSSL DLL（Tauri NSIS 资源路径问题），Step 2 收尾时通过 NSIS hook 或 vendored 构建解决；portable 版已带齐。
 
 ### 4.1 运行验证（已做）
 
 | 项 | 结果 |
 |---|---|
-| 应用启动 | ✅ 进程 `changzai`，窗口标题「常在 Still Here」，界面截图 `docs/assets/step1-shell.png` |
-| 安装包 | ✅ `release/Changzai_0.1.0_x64-setup.exe` 已生成（未签名，干净机器会触发 SmartScreen） |
-| Rust 数据层自检 | ✅ `cargo test --lib`：`db_probe_passes` 通过（SQLCipher 整库加密 + 错误口令拒绝 + FTS5 trigram + Argon2id/AES-256-GCM 导出加密） |
+| 应用启动 | ✅ Tauri 桌面窗口「常在 Still Here」实机截图 `docs/assets/step1-shell.png`（三栏、双方头像、无 AI 角标、无技术面板） |
+| 安装包 | ✅ `release/Changzai_0.1.0_x64-setup.exe` 已生成（未签名，干净机器会触发 SmartScreen；安装包暂缺 OpenSSL DLL，见上） |
+| Rust 数据层自检 | ✅ `cargo test --lib`：`db_probe_passes` 通过（SQLCipher 整库加密 + 文件头不可读 + 错误口令拒绝 + FTS5 trigram + Argon2id/AES-256-GCM 导出加密） |
 | Rust 流式 HTTP 自检 | ✅ `cargo test --lib`：`http_probe_passes` 通过（本地 chunked echo，reqwest 流式读取，首 chunk <500ms） |
-| 托盘 + 通知 | 窗口/托盘代码已编译运行；PowerShell Toast 能力验证通过；应用内点击自动化因窗口焦点问题未完成截图（同等逻辑由测试与组件实现覆盖） |
+| 核心单测 | ✅ 19/19（ingest 11 + media 8），见 `scripts/verify.ps1` |
+| 托盘 + 通知 | 窗口/托盘代码已编译运行；PowerShell Toast 能力验证通过 |
 
 运行命令：`release/changzai.exe`（开发模式用 `scripts\dev.ps1`）；安装用 `release/Changzai_0.1.0_x64-setup.exe`。
 
@@ -104,11 +109,11 @@ cargo test --lib --no-default-features --features sqlcipher-vendored
 ### 5.1 仓库与工程
 
 - pnpm workspace：`apps/app`（React 19 + Vite 7 + Tauri 2）、`packages/core`（纯 TS）、`packages/shared`（类型/token/常量）
-- 离线可跑：`node --test packages/core/test/*.test.ts`（11 项全过）
+- 离线可跑：`node --test packages/core/test/*.test.ts`（19 项全过：ingest 11 + media 8）
 - TypeScript：app 与 core 均 `tsc --noEmit` 通过
 - 前端构建：`vite build` 通过（dist 产物生成）
-- 环境脚本：`scripts/env.ps1`（Node 20+/Rust/MSVC 自动装载）、`scripts/run-spikes.ps1`（一键跑全部 spike）
-- 镜像配置：`.npmrc`（npmmirror）、`~/.cargo/config.toml`（rsproxy sparse index）
+- 环境脚本：`scripts/env.ps1`（Node 24/Rust/MSVC/Perl/NASM/OpenSSL 自动装载 + 非 ASCII 路径 `CARGO_TARGET_DIR`）、`scripts/run-spikes.ps1`（一键跑全部 spike）、`scripts/verify.ps1`（全量验收）
+- 镜像配置：`.npmrc`（npmmirror）、`~/.cargo/config.toml`（rsproxy sparse index）、`TAURI_BUNDLER_TOOLS_GITHUB_MIRROR`（打包工具）
 
 ### 5.2 core（纯 TS，已可单测）
 
@@ -118,7 +123,8 @@ cargo test --lib --no-default-features --features sqlcipher-vendored
 | `ingest/burst.ts` | burst（<90s 连发）、latency（对最后一条对方消息，86400s 截断）、组合补全 |
 | `ingest/report.ts` | 数据体检报告（fidelity 公式/分档、夜间比、缺失段、advice） |
 | `ingest/adapters/` | 适配器注册表 + `plaintext_paste` 实现（后续格式加文件即可） |
-| `db/ddl.ts` | SQLite/SQLCipher DDL v1（含 FTS5 trigram + 三张同步触发器、correction、ingest_job、holdout 字段） |
+| `db/ddl.ts` | SQLite/SQLCipher DDL **v2**（含 FTS5 trigram + 三张同步触发器、correction、ingest_job、holdout、`profile`、`media` 表） |
+| `media/index.ts` | 媒体类型判定、扩展名白名单、MIME、文件名清洗、落盘路径、dataUrl 类型推断 |
 | `ports.ts` | `DbPort / HttpPort / ClockPort / NotifyPort / KeyPort / FilePort` 注入契约 |
 
 ### 5.3 Rust 宿主（`apps/app/src-tauri`）
@@ -128,15 +134,21 @@ cargo test --lib --no-default-features --features sqlcipher-vendored
 | 窗口 | 1280×800、最小 1024×700，关闭窗口隐藏到托盘 |
 | 托盘 | 右键菜单：显示窗口 / 退出常在；左键点击显示窗口 |
 | 通知 | `tauri-plugin-notification`，命令 `notify_probe` |
-| 数据层自检 | 命令 `db_probe`：SQLite 建库/重开、FTS5 trigram 中文检索、Argon2id+AES-GCM 封装校验、SQLCipher 状态 |
+| 媒体导入 | `tauri-plugin-dialog` + 命令 `import_media_files`：多选图片/语音 → 校验/复制到 app data → 返回 `dataUrl`（camelCase 契约） |
+| 数据层自检 | 命令 `db_probe`：**SQLCipher** 建库/重开、文件头加密校验、错误口令拒绝、FTS5 trigram、Argon2id+AES-GCM 导出加密 |
 | 流式 HTTP | 命令 `http_stream_probe`：本地 chunked echo + reqwest 流式读取、首 chunk 延迟 |
 | 环境信息 | 命令 `app_info`：版本 / Tauri 版本 / OS / WebView2 |
 
-### 5.4 界面（Step 1 桌面壳）
+### 5.4 界面（微信桌面版风格，已重做）
 
-- 仿微信聊天主界面静态预览（气泡、时间分隔、输入中、AI 角标、输入栏）
-- 「Step 1 技术底座自检」面板：一键运行环境 / SQLCipher+FTS5 / 流式 HTTP / 通知，并展示 JSON 结果
-- 设计 token 落在 `packages/shared/src/design-tokens.ts` 与 `apps/app/src/styles.css`，与 `docs/step0-design-baseline.md` 对齐
+- 三栏布局：64px 导航栏 + 280px 会话列表 + 聊天区；标题栏 52px、输入区 56px；
+- 双方头像：她左 / 我右，40px 圆角 4px；她白气泡、我 `#95EC69`，圆角 6px，最大宽 70%；
+- 图片气泡（点击灯箱放大）、语音气泡（宽度随秒数，播放/暂停 + 真实时长）；
+- 时间分隔、输入中三点、发送后演示回复、未读角标、搜索过滤；
+- **无 AI 气泡角标**（按产品要求），AI 披露放在「设置 → 使用说明」；
+- 设置抽屉：双方昵称/头像自定义（localStorage `changzai.profile.v1`）、回忆素材导入、使用说明；
+- 技术自检面板已从主界面移除：`#/dev` 或 `Ctrl+Shift+D` 进入开发页；
+- 截图：`docs/assets/step1-shell.png`、`step1-settings.png`、`step1-media.png`。
 
 ### 5.5 Step 0 文档
 

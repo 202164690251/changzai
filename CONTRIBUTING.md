@@ -34,7 +34,7 @@ powershell -ExecutionPolicy Bypass -File scripts\verify.ps1
 
 | 分支 | 用途 | 规则 |
 |---|---|---|
-| `main` | 唯一长期分支 | **保护分支**：不能直接 push，必须 PR + 1 人 review；禁止 force push / 删除 |
+| `main` | 唯一长期分支 | 团队约定：不直接 push，必须 PR + 1 人 review，禁止 force push / 删除（GitHub 免费私有仓库暂不支持强制分支保护；升级 Pro 或仓库公开后可启用） |
 | `feat/<scope>-<short>` | 新功能 | 例：`feat/ui-wechat-shell`、`feat/ingest-adapters` |
 | `fix/<scope>-<short>` | 缺陷修复 | 例：`fix/db-probe-wrong-key` |
 | `docs/<short>` / `chore/<short>` | 文档 / 工程杂项 | 可单人快速合并（仍需 CI 通过） |
@@ -98,7 +98,7 @@ git push -u origin feat/ui-wechat-shell
 
 - **团队协作（有写权限）**：仓库 Settings → Collaborators → Add people，按 GitHub 用户名邀请，权限给 `Write`（不要给 Admin）。
 - **外部贡献（无写权限）**：Fork 本仓库 → 在 fork 上开分支 → 向本仓库 `main` 发 PR，同样过 CI + review。
-- 分支保护规则已开启：`main` 不接受直接 push；review 通过后由有权限的人 Squash merge。
+- 分支保护：当前靠团队约定 + CI + Review；若仓库升级 GitHub Pro 或设为 Public，可在 Settings → Branches 启用强制保护（禁止直接 push、要求 review/CI）。
 
 ## 9. 出问题找谁
 

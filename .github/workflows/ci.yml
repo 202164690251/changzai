@@ -60,29 +60,35 @@ jobs:
             )
             foreach ($root in $roots) {
               if (-not (Test-Path $root)) { continue }
-              if (Test-Path (Join-Path $root 'include\openssl\ssl.h')) { return $root }
-              $hit = Get-ChildItem $root -Recurse -Filter 'ssl.h' -ErrorAction SilentlyContinue |
-                Where-Object { $_.DirectoryName -like '*\include\openssl' } |
+              $hit = Get-ChildItem $root -Recurse -Filter 'libcrypto.lib' -ErrorAction SilentlyContinue |
                 Select-Object -First 1
               if ($hit) {
-                $includeDir = Split-Path $hit.DirectoryName -Parent   # ...\include
-                return (Split-Path $includeDir -Parent)               # <root>
+                $libDir = $hit.DirectoryName
+                $includeDir = $null
+                $ssl = Get-ChildItem $root -Recurse -Filter 'ssl.h' -ErrorAction SilentlyContinue |
+                  Where-Object { $_.DirectoryName -like '*\include\openssl' } |
+                  Select-Object -First 1
+                if ($ssl) { $includeDir = Split-Path $ssl.DirectoryName -Parent }
+                return [pscustomobject]@{ LibDir = $libDir; IncludeDir = $includeDir }
               }
             }
             return $null
           }
 
-          $dir = Find-OpenSSL
-          if (-not $dir) {
+          $found = Find-OpenSSL
+          if (-not $found) {
             choco install openssl -y --no-progress
             $env:Path = 'C:\Program Files\OpenSSL\bin;' + $env:Path
-            $dir = Find-OpenSSL
+            $found = Find-OpenSSL
           }
-          if (-not $dir) { throw 'OpenSSL not found after install' }
-          "OPENSSL_DIR=$dir" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-          $bin = Join-Path $dir 'bin'
+          if (-not $found) { throw 'OpenSSL not found after install' }
+          "OPENSSL_LIB_DIR=$($found.LibDir)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          if ($found.IncludeDir) {
+            "OPENSSL_INCLUDE_DIR=$($found.IncludeDir)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          }
+          $bin = Join-Path (Split-Path (Split-Path $found.LibDir -Parent) -Parent) 'bin'
           if (Test-Path $bin) { $bin | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8 }
-          Write-Host "OpenSSL: $dir"
+          Write-Host "OpenSSL lib=$($found.LibDir) include=$($found.IncludeDir)"
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: apps/app/src-tauri -> target
