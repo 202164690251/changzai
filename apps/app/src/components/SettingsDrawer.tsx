@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent, ReactElement } from "react";
-import { personaHeadline, type PersonaProfile } from "@changzai/core";
+import { personaHeadline, describeEmotion, weatherLabel, type EmotionState, type PersonaProfile } from "@changzai/core";
 import type { ImportState } from "../hooks/useMediaImport.ts";
 import { readAvatarFile } from "../lib/avatar.ts";
 import { MAX_NAME_LENGTH, displayName, type PersonKey, type Profile } from "../lib/profile.ts";
@@ -29,6 +29,10 @@ export interface SettingsDrawerProps {
   personaBusy: boolean;
   personaMessage: string | null;
   onRebuildPersona: () => void;
+  emotion: EmotionState;
+  analyticsCounts: Record<string, number>;
+  analyticsTotal: number;
+  onClearAnalytics: () => void;
 }
 
 /** 设置抽屉：双方昵称/头像、回忆素材导入、使用说明。 */
@@ -53,6 +57,10 @@ export function SettingsDrawer({
   personaBusy,
   personaMessage,
   onRebuildPersona,
+  emotion,
+  analyticsCounts,
+  analyticsTotal,
+  onClearAnalytics,
 }: SettingsDrawerProps): ReactElement {
   const herInputRef = useRef<HTMLInputElement | null>(null);
   const meInputRef = useRef<HTMLInputElement | null>(null);
@@ -279,6 +287,11 @@ export function SettingsDrawer({
             ) : (
               <p className="settings-hint">导入聊天记录后会自动生成人格卡；也可以从已有消息手动重建。</p>
             )}
+            <p className="settings-note">
+              当前状态：{weatherLabel(emotion.weather)} · 亲近度 {emotion.closeness.toFixed(2)} · 紧张度{" "}
+              {emotion.tension.toFixed(2)}
+            </p>
+            <p className="settings-hint">{describeEmotion(emotion)}</p>
             <div className="media-actions">
               <button
                 type="button"
@@ -322,6 +335,23 @@ export function SettingsDrawer({
             {media.message !== null && (
               <p className={`settings-message ${media.ok === true ? "ok" : "bad"}`}>{media.message}</p>
             )}
+          </section>
+
+          <section className="settings-section" aria-labelledby="settings-stats">
+            <header className="settings-section-head">
+              <h3 id="settings-stats">本地统计</h3>
+              <button type="button" className="link-btn" onClick={onClearAnalytics}>
+                清空
+              </button>
+            </header>
+            <p className="settings-hint">只在本机记录漏斗，不上传；清空后不可恢复。</p>
+            <ul className="usage-list">
+              <li>启动：{analyticsCounts.app_open ?? 0} 次</li>
+              <li>导入完成：{analyticsCounts.import_done ?? 0} 次</li>
+              <li>首次对话：{analyticsCounts.first_message ?? 0} 次</li>
+              <li>我发出的消息：{analyticsCounts.message_me ?? 0} 条</li>
+              <li>总计事件：{analyticsTotal} 条</li>
+            </ul>
           </section>
 
           <section className="settings-section" aria-labelledby="settings-usage">

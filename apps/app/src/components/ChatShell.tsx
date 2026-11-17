@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactElement } from "react";
 import { useChat, lastMessageOf, messagePreview } from "../hooks/useChat.ts";
+import { useAnalytics } from "../hooks/useAnalytics.ts";
 import { useDatabase } from "../hooks/useDatabase.ts";
+import { useEmotion } from "../hooks/useEmotion.ts";
 import { useImport } from "../hooks/useImport.ts";
 import { useLlmConfig } from "../hooks/useLlmConfig.ts";
 import { useMediaImport } from "../hooks/useMediaImport.ts";
@@ -12,6 +14,7 @@ import { readChatImageFile } from "../lib/avatar.ts";
 import { displayName } from "../lib/profile.ts";
 import type { PersonProfile } from "../lib/profile.ts";
 import type { ImportedMediaFile } from "../lib/tauri.ts";
+import { api } from "../lib/tauri.ts";
 import { ConversationList } from "./ConversationList.tsx";
 import { ChatHeader } from "./ChatHeader.tsx";
 import { Composer, type ComposerAction } from "./Composer.tsx";
@@ -28,6 +31,8 @@ export function ChatShell(): ReactElement {
   const db = useDatabase();
   const llm = useLlmConfig();
   const persona = usePersona();
+  const emotion = useEmotion();
+  const analytics = useAnalytics();
   const { profile, storageError, setName, setAvatar, reset } = useProfile(db.ready);
   const { toast, show } = useToast();
   const { messages, typing, unread, sendText, sendImage, appendImported, clear, markRead } = useChat({
@@ -35,6 +40,8 @@ export function ChatShell(): ReactElement {
     llm: llm.config,
     herName: displayName(profile.her, "ta"),
     meName: displayName(profile.me, "我"),
+    emotion: emotion.state,
+    onEmotion: emotion.update,
     onNotice: show,
   });
 
@@ -46,8 +53,32 @@ export function ChatShell(): ReactElement {
   const importer = useImport(async (result) => {
     await db.refresh();
     await persona.buildFromImport(result.messages);
+    void api.memoryRebuild().catch(() => undefined);
+    analytics.log("import_done");
     show("人格卡已生成，可以在设置里查看");
   });
+
+  const loggedOpen = useRef(false);
+  useEffect(() => {
+    if (!db.ready || loggedOpen.current) return;
+    loggedOpen.current = true;
+    analytics.log("app_open");
+  }, [analytics, db.ready]);
+
+  const loggedFirst = useRef(false);
+
+  // 已有消息但记忆为空时（老版本升级）自动重建一次
+  useEffect(() => {
+    if (!db.ready || !db.stats?.ok || db.stats.messageCount === 0) return;
+    void (async () => {
+      try {
+        const count = await api.memoryCount();
+        if (count === 0) await api.memoryRebuild();
+      } catch {
+        /* 记忆不可用不影响聊天 */
+      }
+    })();
+  }, [db.ready, db.stats?.messageCount]);
 
   const clearedDemo = useRef(false);
   useEffect(() => {
@@ -103,9 +134,14 @@ export function ChatShell(): ReactElement {
 
   const handleSend = useCallback(
     (text: string) => {
+      analytics.log("message_me");
+      if (!loggedFirst.current) {
+        loggedFirst.current = true;
+        analytics.log("first_message");
+      }
       sendText(text);
     },
-    [sendText],
+    [analytics, sendText],
   );
 
   const handlePickImage = useCallback(
@@ -186,6 +222,10 @@ export function ChatShell(): ReactElement {
           onRebuildPersona={() => {
             void persona.rebuildFromDb();
           }}
+          emotion={emotion.state}
+          analyticsCounts={analytics.counts}
+          analyticsTotal={analytics.total}
+          onClearAnalytics={analytics.clear}
         />
       )}
 
