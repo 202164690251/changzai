@@ -66,11 +66,11 @@ powershell -ExecutionPolicy Bypass -File scripts\build.ps1   # Windows 安装包
 
 主界面（仿微信 4.x 桌面版；无 AI 气泡角标，AI 披露在「设置 → 使用说明」）：
 
-![聊天主界面](docs/assets/step1-shell.png)
+![聊天主界面](docs/assets/step3-shell.png)
 
 | 设置（双方昵称/头像、素材导入、使用说明） | 导入图片/语音后的气泡 |
 |---|---|
-| ![设置](docs/assets/step1-settings.png) | ![素材](docs/assets/step1-media.png) |
+| ![设置（模型/人格卡入口）](docs/assets/step3-settings.png) | ![素材](docs/assets/step1-media.png) |
 
 > 开发调试页（技术自检）已从主界面移除：浏览器地址加 `#/dev` 或按 `Ctrl+Shift+D` 打开。
 
@@ -94,6 +94,10 @@ powershell -ExecutionPolicy Bypass -File scripts\build.ps1   # Windows 安装包
 | Step 2 真实数据持久化 | ✅ `db_init` / `import_persist` / `db_stats` / `profile_*` / `media_persist`；Rust 4 项测试 |
 | Step 2 示例数据 | ✅ `examples/` 合成聊天文件，可直接导入测试（无隐私） |
 | AI 披露方式 | ✅ 不做每条气泡角标；改为「设置 → 使用说明」+ 首启说明（见 `docs/step0-decisions.md`） |
+| 默认称呼 | ✅ 系统默认 **ta**（不再叫「小林」）；旧默认自动迁移，用户可自行改 |
+| Step 3 人格卡 | ✅ 风格卡/事实/参考对话/边界，8 项单测；holdout 自动排除 |
+| Step 3 模型接入 | ✅ OpenAI 兼容配置；API Key 存 SQLCipher；Rust SSE 流式回复 |
+| Step 3 聊天 | ✅ 已接入真实模型（无配置/无记录时保留演示回复） |
 | 技术自检面板 | ✅ 从主界面移除；`#/dev` 或 Ctrl+Shift+D 进入开发页 |
 | 多端（iOS/Android） | ⏳ 本期不做（架构已保留） |
 
@@ -120,11 +124,11 @@ git switch -c feat/your-task
 4. 数据格式带 `schema_version`，迁移可重放；
 5. 调度（纯逻辑）与投递（平台实现）分离。
 
-## 接下来（Step 3：人格蒸馏与可聊）
+## 接下来（Step 3 收尾 / Step 4）
 
-1. 情绪标注 + Kappa 校准；Style Card / Episode / 情境-反应对 / 事实锁；
-2. 人格卡审阅 + Correction 层；holdout 泄漏校验 + 黄金集回归；
-3. 对话运行时（Compose/Decide/Filter）+ 多模型接入；
-4. 用真实数据跑 5 万条性能与首次盲测。
+1. 情绪标注 + Kappa 校准；人格卡审阅与逐条事实确认；
+2. Correction 层（用户纠正「ta 不会这样说」）；holdout 黄金集回归；
+3. 流式停止/重试/上下文管理；多模型切换与费用提示；
+4. 真实数据下的 5 万条性能与首次盲测。
 
-> Step 2 进度与限制见 [docs/step2-progress.md](docs/step2-progress.md)；详细任务拆分见 [docs/step2-plan.md](docs/step2-plan.md)。
+> Step 2 进度见 [docs/step2-progress.md](docs/step2-progress.md)；Step 3 进度与手动测试见 [docs/step3-progress.md](docs/step3-progress.md)。

@@ -15,11 +15,18 @@ export type PersonKey = keyof Profile;
 
 export const PROFILE_STORAGE_KEY = "changzai.profile.v1";
 export const MAX_NAME_LENGTH = 12;
+/** 旧版本默认名，读取时迁移为中性称呼 */
+const LEGACY_DEFAULT_NAME = "小林";
 
 export const DEFAULT_PROFILE: Profile = {
-  her: { name: "小林", avatar: null },
+  her: { name: "ta", avatar: null },
   me: { name: "我", avatar: null },
 };
+
+/** 旧默认「小林」→ ta；用户自己改的名字不动 */
+export function migrateDefaultName(name: string): string {
+  return name.trim() === LEGACY_DEFAULT_NAME ? "ta" : name;
+}
 
 /** 深拷贝一份默认资料，避免调用方误改常量。 */
 export function defaultProfile(): Profile {
@@ -29,7 +36,7 @@ export function defaultProfile(): Profile {
   };
 }
 
-/** 界面上显示的名字：空名字时退回「她 / 我」，避免出现空标题。 */
+/** 界面上显示的名字：空名字时退回「ta / 我」，避免出现空标题。 */
 export function displayName(person: PersonProfile, fallback: string): string {
   const name = person.name.trim();
   return name.length > 0 ? name : fallback;
@@ -39,7 +46,7 @@ function readPerson(value: unknown, fallback: PersonProfile): PersonProfile {
   if (typeof value !== "object" || value === null) return { ...fallback };
   const record = value as Record<string, unknown>;
   const rawName = typeof record.name === "string" ? record.name.slice(0, MAX_NAME_LENGTH) : "";
-  const name = rawName.trim().length > 0 ? rawName : fallback.name;
+  const name = rawName.trim().length > 0 ? migrateDefaultName(rawName) : fallback.name;
   const rawAvatar = record.avatar;
   const avatar = typeof rawAvatar === "string" && rawAvatar.startsWith("data:image/") ? rawAvatar : null;
   return { name, avatar };

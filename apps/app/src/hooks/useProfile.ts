@@ -3,6 +3,7 @@ import {
   MAX_NAME_LENGTH,
   defaultProfile,
   loadProfile,
+  migrateDefaultName,
   saveProfile,
   type PersonKey,
   type Profile,
@@ -19,7 +20,7 @@ export interface ProfileApi {
 
 function toPayload(profile: Profile): { her: { name: string; avatar: string | null }; me: { name: string; avatar: string | null } } {
   return {
-    her: { name: profile.her.name.trim() || "她", avatar: profile.her.avatar },
+    her: { name: profile.her.name.trim() || "ta", avatar: profile.her.avatar },
     me: { name: profile.me.name.trim() || "我", avatar: profile.me.avatar },
   };
 }
@@ -45,7 +46,7 @@ export function useProfile(dbReady = false): ProfileApi {
         if (loaded !== null) {
           setProfile((previous) => ({
             her: {
-              name: loaded.her.name.trim() || previous.her.name,
+              name: migrateDefaultName(loaded.her.name).trim() || previous.her.name,
               avatar: loaded.her.avatar ?? previous.her.avatar,
             },
             me: {

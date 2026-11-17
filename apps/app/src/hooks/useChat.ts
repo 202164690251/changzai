@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { buildChatMessages, type PersonaProfile } from "@changzai/core";
 import { DEMO_VOICE_SECONDS, demoImageDataUrl, demoVoiceDataUrl } from "../lib/demoMedia.ts";
 import { formatTimeDivider } from "../lib/time.ts";
-import type { ImportedMediaFile } from "../lib/tauri.ts";
+import { api, type ImportedMediaFile, type LlmConfig } from "../lib/tauri.ts";
 
 export type ChatSender = "her" | "me";
 
@@ -73,6 +74,15 @@ export function lastMessageOf(messages: ChatMsg[]): ChatMsg | undefined {
   return messages.length > 0 ? messages[messages.length - 1] : undefined;
 }
 
+export interface ChatOptions {
+  persona: PersonaProfile | null;
+  llm: LlmConfig | null;
+  herName: string;
+  meName: string;
+  /** 无法回复 / 配置缺失时的提示 */
+  onNotice?: (text: string) => void;
+}
+
 export interface ChatApi {
   messages: ChatMsg[];
   typing: boolean;
@@ -84,11 +94,18 @@ export interface ChatApi {
   markRead: () => void;
 }
 
+function llmUsable(llm: LlmConfig | null): boolean {
+  if (!llm) return false;
+  return llm.apiKey.trim().length > 0 || /localhost|127\.0\.0\.1/.test(llm.baseUrl);
+}
+
 /**
- * 当前只有一段对话（产品基线是一对一）。
- * 发消息后会短暂显示「对方正在输入…」，再回一句演示回复；Step 6 换成真实消息流。
+ * 一对一聊天。
+ * - 已生成人格卡 + 配置模型：走 Rust 流式 LLM，逐字追加她的回复；
+ * - 都没有：保留 Step 1 的演示回复（方便首次体验）；
+ * - 只有人格卡没有模型：提示去设置里配置，不伪造回复。
  */
-export function useChat(): ChatApi {
+export function useChat(options: ChatOptions): ChatApi {
   const [messages, setMessages] = useState<ChatMsg[]>(seedMessages);
   const [typing, setTyping] = useState(false);
   const [unread, setUnread] = useState(2);
@@ -129,18 +146,83 @@ export function useChat(): ChatApi {
     }, 2200);
   }, [clearReplyTimer, nextId]);
 
+  const streamReply = useCallback(
+    (userText: string, history: ChatMsg[]): void => {
+      const persona = options.persona;
+      const llm = options.llm;
+      if (!persona || !llm) return;
+      clearReplyTimer();
+      setTyping(true);
+      const payload = buildChatMessages(
+        persona,
+        history
+          .filter((message): message is TextMessage => message.kind === "text" && message.id.startsWith("msg-") && message.from !== "system")
+          .map((message) => ({ from: message.from === "her" ? "her" : "me", text: message.text })),
+        userText,
+        { name: options.herName, selfName: options.meName },
+      );
+      const replyId = nextId();
+      let started = false;
+      void api
+        .llmChatStream(
+          payload.map((message) => ({ role: message.role, content: message.content })),
+          (event) => {
+            if (event.kind === "delta" && event.text.length > 0) {
+              setTyping(false);
+              if (!started) {
+                started = true;
+                setMessages((previous) => [
+                  ...previous,
+                  { id: replyId, from: "her", kind: "text", text: event.text, ts: Date.now() },
+                ]);
+              } else {
+                setMessages((previous) =>
+                  previous.map((message) =>
+                    message.id === replyId && message.kind === "text"
+                      ? { ...message, text: message.text + event.text }
+                      : message,
+                  ),
+                );
+              }
+            } else if (event.kind === "error") {
+              setTyping(false);
+              options.onNotice?.(event.text);
+            } else if (event.kind === "done") {
+              setTyping(false);
+              if (!started) options.onNotice?.("模型没有返回内容，请检查模型名或额度");
+            }
+          },
+        )
+        .catch((error: unknown) => {
+          setTyping(false);
+          options.onNotice?.(error instanceof Error ? error.message : String(error));
+        });
+    },
+    [clearReplyTimer, nextId, options],
+  );
+
   const sendText = useCallback(
     (text: string) => {
+      if (typing) return;
       const value = text.trim();
       if (value.length === 0) return;
+      const history = messages;
       setMessages((previous) => [
         ...previous,
         { id: nextId(), from: "me", kind: "text", text: value, ts: Date.now() },
       ]);
       setUnread(0);
+      if (options.persona && options.persona.source.her_messages > 0) {
+        if (llmUsable(options.llm)) {
+          streamReply(value, history);
+        } else {
+          options.onNotice?.("已生成人格卡；请先在「设置 → 模型」里填写 API Key 和模型名");
+        }
+        return;
+      }
       scheduleReply();
     },
-    [nextId, scheduleReply],
+    [messages, nextId, options, scheduleReply, streamReply, typing],
   );
 
   const sendImage = useCallback(
@@ -160,7 +242,6 @@ export function useChat(): ChatApi {
       clearReplyTimer();
       setTyping(false);
       const now = Date.now();
-      // 导入的素材前补一条居中时间，保证「当前时间」始终可见（和微信的时间分隔同款样式）。
       const stamp: ChatMsg = {
         id: nextId(),
         from: "system",

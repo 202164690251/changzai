@@ -71,7 +71,7 @@ export function ImportWizard({
               </div>
               <p className="settings-note">
                 {dbStats?.ok && dbStats.messageCount > 0
-                  ? `数据库里已有 ${formatNumber(dbStats.messageCount)} 条消息（她的 ${formatNumber(dbStats.herCount)} 条）。再次导入会按消息 ID 去重合并。`
+                  ? `数据库里已有 ${formatNumber(dbStats.messageCount)} 条消息（ta 的 ${formatNumber(dbStats.herCount)} 条）。再次导入会按消息 ID 去重合并。`
                   : "第一次导入会建立本地加密数据库；导入前请先在微信电脑版导出聊天记录。"}
               </p>
               <p className="settings-warn">所有内容只在本机加密存储，不上传；holdout 会自动单独封存用于后续评测。</p>
@@ -132,7 +132,7 @@ export function ImportWizard({
                   <strong className="report-value">{formatNumber(report.total_msgs)}</strong>
                 </div>
                 <div className="report-item">
-                  <span className="report-label">她的消息</span>
+                  <span className="report-label">ta 的消息</span>
                   <strong className="report-value">{formatNumber(report.her_msgs)}</strong>
                 </div>
                 <div className="report-item">

@@ -36,7 +36,7 @@ export function SidePanel({ tab, her, onOpenChat }: SidePanelProps): ReactElemen
             <span className="side-contact-sub">常联系的人</span>
           </span>
         </button>
-        <p className="side-empty">通讯录里只有她一个人。</p>
+        <p className="side-empty">通讯录里只有 ta 一个人。</p>
       </div>
     </section>
   );

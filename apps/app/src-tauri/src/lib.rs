@@ -1,5 +1,6 @@
 mod db;
 mod http_probe;
+mod llm;
 mod media;
 mod store;
 mod tray;
@@ -72,7 +73,15 @@ pub fn run() {
             store::profile_save,
             store::profile_load,
             store::media_persist,
-            store::pick_import_files
+            store::pick_import_files,
+            store::setting_get,
+            store::setting_set,
+            store::persona_save,
+            store::persona_load,
+            store::messages_load,
+            llm::llm_config_load,
+            llm::llm_config_save,
+            llm::llm_chat_stream
         ])
         .setup(|app| {
             // 托盘常驻：关闭窗口 = 隐藏，进程继续跑（主动消息的前提）

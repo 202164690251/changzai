@@ -14,5 +14,8 @@ export * from "./ingest/adapters/wechatmsg-csv.ts";
 export * from "./ingest/adapters/liuhen-json.ts";
 export * from "./ingest/adapters/qq-txt.ts";
 export * from "./ingest/pipeline.ts";
+export * from "./persona/types.ts";
+export * from "./persona/build.ts";
+export * from "./persona/prompt.ts";
 export * from "./media/index.ts";
 export * from "./db/ddl.ts";

@@ -40,7 +40,7 @@ export const MEDIA = {
 
 /** 资料默认值（与 UI 默认 demo 一致） */
 export const DEFAULT_PROFILES = {
-  her: { name: "小林", avatar: null },
+  her: { name: "ta", avatar: null },
   me: { name: "我", avatar: null },
 } as const;
 
