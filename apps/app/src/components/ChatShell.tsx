@@ -185,7 +185,12 @@ export function ChatShell(): ReactElement {
 
   // 旧数据：只有 persona/chat_message，没有会话记录时，创建默认会话
   useEffect(() => {
-    if (!db.ready || !conversations.ready || !persona.ready) return;
+    if (suppressConversationSync.current || !db.ready || !conversations.ready || !persona.ready) return;
+    if (defaultConversationChecked.current) {
+      if (!conversations.activeId && conversations.items[0]) conversations.setActive(conversations.items[0].id);
+      return;
+    }
+    defaultConversationChecked.current = true;
     if (conversations.items.length === 0) {
       if (!persona.profile) return;
       const now = Date.now();
@@ -197,14 +202,6 @@ export function ChatShell(): ReactElement {
         persona: persona.profile,
         relationship: relationship.profile ?? fallbackRelationship(meName),
         greeting: "",
-        settings: {
-          llm: llm.config,
-          proactive: DEFAULT_PROACTIVE_STATE,
-          emotion: DEFAULT_EMOTION,
-          emotionOverride: null,
-          styleReviewEnabled: false,
-          styleFeedback: [],
-        },
         createdAt: now,
         updatedAt: now,
       };
@@ -601,6 +598,7 @@ export function ChatShell(): ReactElement {
   // 切换/启动时加载该聊天自己的模型、主动消息、情绪、风格反馈
   useEffect(() => {
     if (!activeConversation) return;
+    if (!llm.ready || !proactive.ready || !emotion.ready || !styleFeedback.ready) return;
     if (loadedConversationRef.current === activeConversation.id) return;
     loadedConversationRef.current = activeConversation.id;
     persona.replace(activeConversation.persona);
