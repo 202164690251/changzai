@@ -9,10 +9,11 @@ export interface ChatHeaderProps {
   typing: boolean;
   onOpenSettings: () => void;
   onRecall: () => void;
+  onMemory: () => void;
 }
 
 /** 52px 聊天标题栏：左边她的头像、名字、在线状态；右边「⋯」。 */
-export function ChatHeader({ her, typing, onOpenSettings, onRecall }: ChatHeaderProps): ReactElement {
+export function ChatHeader({ her, typing, onOpenSettings, onRecall, onMemory }: ChatHeaderProps): ReactElement {
   const [menuOpen, setMenuOpen] = useState(false);
   return (
     <header className="chat-header">
@@ -47,6 +48,16 @@ export function ChatHeader({ her, typing, onOpenSettings, onRecall }: ChatHeader
               }}
             >
               撤回上一条
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setMenuOpen(false);
+                onMemory();
+              }}
+            >
+              翻一翻
             </button>
             <button
               type="button"

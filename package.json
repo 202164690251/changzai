@@ -11,6 +11,7 @@
     "build:web": "pnpm --filter @changzai/app build",
     "typecheck": "pnpm --filter @changzai/app exec tsc --noEmit && pnpm exec tsc -p packages/core/tsconfig.json --noEmit",
     "test": "node --test packages/core/test/*.test.ts",
+    "eval": "node scripts/eval.ts",
     "spikes": "powershell -ExecutionPolicy Bypass -File scripts/run-spikes.ps1",
     "env": "powershell -ExecutionPolicy Bypass -File scripts/env.ps1"
   },

@@ -35,10 +35,11 @@ export interface ComposerProps {
   onSend: (text: string) => void;
   onPickImage: (file: File) => void;
   onUnavailable: (action: ComposerAction) => void;
+  insert?: { id: number; text: string } | null;
 }
 
 /** 底部输入区：表情 / 图片 / 文件 / 截图 / 语音 + 多行输入 + 绿色发送。 */
-export function Composer({ onSend, onPickImage, onUnavailable }: ComposerProps): ReactElement {
+export function Composer({ onSend, onPickImage, onUnavailable, insert }: ComposerProps): ReactElement {
   const [draft, setDraft] = useState("");
   const [emojiOpen, setEmojiOpen] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -46,6 +47,12 @@ export function Composer({ onSend, onPickImage, onUnavailable }: ComposerProps):
   const composingRef = useRef(false);
 
   const canSend = draft.trim().length > 0;
+
+  useEffect(() => {
+    if (!insert) return;
+    setDraft(insert.text);
+    inputRef.current?.focus();
+  }, [insert?.id]);
 
   useEffect(() => {
     const input = inputRef.current;
