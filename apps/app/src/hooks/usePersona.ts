@@ -2,6 +2,10 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   buildPersonaProfile,
+  buildPresetPersona,
+  buildCustomPersona,
+  findPersonaPreset,
+  type CustomPersonaForm,
   type PersonaProfile,
   type PersonaSourceMessage,
 } from "@changzai/core";
@@ -19,6 +23,8 @@ export interface PersonaApi {
   /** 审阅：保存编辑后的事实列表 */
   updateFacts: (facts: PersonaProfile["facts"]) => Promise<void>;
   updateProfile: (patch: Partial<PersonaProfile>) => Promise<void>;
+  applyPreset: (presetId: string) => Promise<PersonaProfile | null>;
+  applyCustom: (form: CustomPersonaForm) => Promise<PersonaProfile | null>;
   historyCount: number;
   rollback: () => Promise<void>;
 }
@@ -132,6 +138,31 @@ export function usePersona(): PersonaApi {
     [persist, profile],
   );
 
+  const applyPreset = useCallback(
+    async (presetId: string): Promise<PersonaProfile | null> => {
+      const preset = findPersonaPreset(presetId);
+      if (!preset) {
+        setMessage("找不到这个性格模板");
+        return null;
+      }
+      const next = buildPresetPersona(preset, Date.now());
+      await persist(next);
+      setMessage(`已使用「${preset.label}」模板创建人格；可在设置里继续修改。`);
+      return next;
+    },
+    [persist],
+  );
+
+  const applyCustom = useCallback(
+    async (form: CustomPersonaForm): Promise<PersonaProfile | null> => {
+      const next = buildCustomPersona(form, Date.now());
+      await persist(next);
+      setMessage("自定义人格已保存；可在设置里继续修改。");
+      return next;
+    },
+    [persist],
+  );
+
   const updateProfile = useCallback(
     async (patch: Partial<PersonaProfile>): Promise<void> => {
       if (profile === null) return;
@@ -160,5 +191,5 @@ export function usePersona(): PersonaApi {
     }
   }, [history]);
 
-  return { profile, ready, busy, message, buildFromImport, rebuildFromDb, updateFacts, updateProfile, historyCount: history.length, rollback };
+  return { profile, ready, busy, message, buildFromImport, rebuildFromDb, updateFacts, updateProfile, applyPreset, applyCustom, historyCount: history.length, rollback };
 }

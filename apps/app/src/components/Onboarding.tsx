@@ -16,6 +16,7 @@ export interface OnboardingProps {
   onSaveLlm: (config: LlmConfig) => void;
   onFinish: () => void;
   onSkip: () => void;
+  onSkipToPreset: () => void;
 }
 
 const STEPS = ["开始", "导入", "人格卡", "模型"] as const;
@@ -30,6 +31,7 @@ export function Onboarding({
   onSaveLlm,
   onFinish,
   onSkip,
+  onSkipToPreset,
 }: OnboardingProps): ReactElement | null {
   const [step, setStep] = useState(0);
   const [adult, setAdult] = useState(false);
@@ -99,6 +101,9 @@ export function Onboarding({
             <div className="modal-actions">
               <button type="button" className="btn" onClick={back}>
                 上一步
+              </button>
+              <button type="button" className="btn" onClick={onSkipToPreset}>
+                没有记录？先选一个性格
               </button>
               <button type="button" className="btn primary" disabled={!imported} onClick={next}>
                 下一步

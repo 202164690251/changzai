@@ -66,6 +66,7 @@ export interface SettingsDrawerProps {
   onToggleStyleReview: (enabled: boolean) => void;
   onClearStyleFeedback: () => void;
   onOpenMood: () => void;
+  onOpenPersonaStart: () => void;
   onRollbackPersona: () => void;
 }
 

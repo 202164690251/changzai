@@ -34,8 +34,14 @@ export interface PersonaFact {
   text: string;
 }
 
+export type PersonaOrigin = "distilled" | "preset" | "custom";
+
 export interface PersonaProfile {
   version: 1;
+  /** 创建来源；旧数据缺省按 distilled 处理 */
+  origin?: PersonaOrigin;
+  preset_id?: string;
+  custom_prompt?: string;
   built_at: number;
   source: {
     messages: number;

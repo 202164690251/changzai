@@ -421,7 +421,11 @@ export function useChat(options: ChatOptions): ChatApi {
       setMessages((previous) => [...previous, userMessage]);
       persistMessage(userMessage);
       setUnread(0);
-      if (options.persona && options.persona.source.her_messages > 0) {
+      const persona = options.persona;
+      const personaReady =
+        persona !== null &&
+        (persona.origin === "preset" || persona.origin === "custom" || persona.source.her_messages > 0);
+      if (personaReady) {
         if (llmUsable(options.llm)) {
           streamReply(value, history);
         } else {
