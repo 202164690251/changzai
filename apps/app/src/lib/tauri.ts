@@ -62,6 +62,91 @@ export interface ImportMediaResult {
   message: string;
 }
 
+/* ───────────────── Step 2：导入 / 数据库 / 资料 ───────────────── */
+
+export interface PickedImportFile {
+  name: string;
+  path: string;
+  text: string;
+  size: number;
+}
+
+export interface PickImportResult {
+  ok: boolean;
+  files: PickedImportFile[];
+  message: string;
+}
+
+export interface ImportMessageRow {
+  id: string;
+  convId: string;
+  ts: number;
+  sender: string;
+  type: string;
+  content: string;
+  mediaPath: string | null;
+  replyTo: string | null;
+  latencyS: number | null;
+  burstIndex: number;
+  burstSize: number;
+  isHoldout: number;
+}
+
+export interface ImportPayload {
+  sourceNames: string[];
+  messages: ImportMessageRow[];
+  report: unknown;
+}
+
+export interface PersistResult {
+  ok: boolean;
+  inserted: number;
+  holdout: number;
+  dbPath: string;
+  messageCount: number;
+  error: string | null;
+}
+
+export interface DbInitResult {
+  ok: boolean;
+  dbPath: string;
+  messageCount: number;
+  error: string | null;
+}
+
+export interface DbStats {
+  ok: boolean;
+  dbPath: string;
+  messageCount: number;
+  herCount: number;
+  spanDays: number;
+  holdoutCount: number;
+  lastImportAt: number | null;
+}
+
+export interface ProfileSidePayload {
+  name: string;
+  avatar: string | null;
+}
+
+export interface ProfilePayload {
+  her: ProfileSidePayload;
+  me: ProfileSidePayload;
+}
+
+export interface MediaPersistItem {
+  name: string;
+  path: string;
+  size: number;
+  kind: MediaKind;
+}
+
+export interface MediaPersistResult {
+  ok: boolean;
+  inserted: number;
+  message: string;
+}
+
 export function isTauri(): boolean {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }
@@ -133,5 +218,36 @@ export const api = {
       files,
       message: asString(record.message),
     };
+  },
+  /** Step 2：初始化 SQLCipher 数据库（DDL 唯一事实源在 core 包） */
+  async dbInit(ddl: string): Promise<DbInitResult> {
+    requireTauri();
+    return invoke<DbInitResult>("db_init", { ddl });
+  },
+  async dbStats(): Promise<DbStats> {
+    requireTauri();
+    return invoke<DbStats>("db_stats");
+  },
+  /** Step 2：选择聊天记录文件（txt/csv/json），Rust 读取内容并处理编码 */
+  async pickImportFiles(): Promise<PickImportResult> {
+    requireTauri();
+    return invoke<PickImportResult>("pick_import_files");
+  },
+  /** Step 2：把归一化后的消息与报告写入 SQLCipher */
+  async importPersist(payload: ImportPayload): Promise<PersistResult> {
+    requireTauri();
+    return invoke<PersistResult>("import_persist", { payload });
+  },
+  async profileLoad(): Promise<ProfilePayload | null> {
+    requireTauri();
+    return invoke<ProfilePayload | null>("profile_load");
+  },
+  async profileSave(profile: ProfilePayload): Promise<boolean> {
+    requireTauri();
+    return invoke<boolean>("profile_save", { profile });
+  },
+  async mediaPersist(files: MediaPersistItem[]): Promise<MediaPersistResult> {
+    requireTauri();
+    return invoke<MediaPersistResult>("media_persist", { files });
   },
 };

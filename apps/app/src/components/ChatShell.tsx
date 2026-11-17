@@ -1,6 +1,8 @@
 import { useCallback, useMemo, useState } from "react";
 import type { ReactElement } from "react";
 import { useChat, lastMessageOf, messagePreview } from "../hooks/useChat.ts";
+import { useDatabase } from "../hooks/useDatabase.ts";
+import { useImport } from "../hooks/useImport.ts";
 import { useMediaImport } from "../hooks/useMediaImport.ts";
 import { useProfile } from "../hooks/useProfile.ts";
 import { useToast } from "../hooks/useToast.ts";
@@ -12,6 +14,7 @@ import { ConversationList } from "./ConversationList.tsx";
 import { ChatHeader } from "./ChatHeader.tsx";
 import { Composer, type ComposerAction } from "./Composer.tsx";
 import { ImageLightbox, type PreviewImage } from "./ImageLightbox.tsx";
+import { ImportWizard } from "./ImportWizard.tsx";
 import { MessageList } from "./MessageList.tsx";
 import { NavRail, type RailTab } from "./NavRail.tsx";
 import { SettingsDrawer } from "./SettingsDrawer.tsx";
@@ -20,7 +23,8 @@ import { Toast } from "./Toast.tsx";
 
 /** 主界面：64px 导航 + 280px 会话列表 + 聊天区。 */
 export function ChatShell(): ReactElement {
-  const { profile, storageError, setName, setAvatar, reset } = useProfile();
+  const db = useDatabase();
+  const { profile, storageError, setName, setAvatar, reset } = useProfile(db.ready);
   const { messages, typing, unread, sendText, sendImage, appendImported, markRead } = useChat();
   const { toast, show } = useToast();
 
@@ -28,6 +32,18 @@ export function ChatShell(): ReactElement {
   const [search, setSearch] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [preview, setPreview] = useState<PreviewImage | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
+  const importer = useImport(db.refresh);
+
+  const openImport = useCallback(() => {
+    importer.reset();
+    setImportOpen(true);
+  }, [importer]);
+
+  const closeImport = useCallback(() => {
+    setImportOpen(false);
+    importer.reset();
+  }, [importer]);
 
   const handleImported = useCallback(
     (files: ImportedMediaFile[]) => {
@@ -130,8 +146,22 @@ export function ChatShell(): ReactElement {
           media={media.state}
           canImport={media.canImport}
           onImport={media.importMedia}
+          dbStats={db.stats}
+          dbReady={db.ready}
+          dbError={db.error}
+          onOpenImport={openImport}
         />
       )}
+
+      <ImportWizard
+        open={importOpen}
+        state={importer.state}
+        canImport={importer.canImport}
+        dbStats={db.stats}
+        onRun={importer.run}
+        onReset={importer.reset}
+        onClose={closeImport}
+      />
 
       <ImageLightbox image={preview} onClose={() => setPreview(null)} />
       <Toast text={toast?.text ?? null} />
