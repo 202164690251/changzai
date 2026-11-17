@@ -479,6 +479,96 @@ fn persist_media_at(dir: &Path, files: &[MediaPersistItem]) -> Result<i64, Strin
 
 // ───────────────────────── Tauri commands ─────────────────────────
 
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatStoredMessage {
+    pub id: String,
+    pub ts: i64,
+    pub payload: String,
+}
+
+fn chat_append_at(dir: &Path, id: &str, ts: i64, payload: &str) -> Result<(), String> {
+    let conn = open_at(dir)?;
+    if !table_exists(&conn, "chat_message")? {
+        return Ok(());
+    }
+    conn.execute(
+        "INSERT OR REPLACE INTO chat_message(id, ts, payload) VALUES (?1, ?2, ?3)",
+        params![id, ts, payload],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+fn chat_load_at(dir: &Path, limit: usize) -> Result<Vec<ChatStoredMessage>, String> {
+    let conn = open_at(dir)?;
+    if !table_exists(&conn, "chat_message")? {
+        return Ok(Vec::new());
+    }
+    let mut stmt = conn
+        .prepare("SELECT id, ts, payload FROM chat_message ORDER BY ts DESC, rowid DESC LIMIT ?1")
+        .map_err(|e| e.to_string())?;
+    let mut rows = stmt.query(params![limit as i64]).map_err(|e| e.to_string())?;
+    let mut out = Vec::new();
+    while let Some(row) = rows.next().map_err(|e| e.to_string())? {
+        out.push(ChatStoredMessage {
+            id: row.get(0).map_err(|e| e.to_string())?,
+            ts: row.get(1).map_err(|e| e.to_string())?,
+            payload: row.get(2).map_err(|e| e.to_string())?,
+        });
+    }
+    out.reverse();
+    Ok(out)
+}
+
+fn chat_delete_at(dir: &Path, id: &str) -> Result<(), String> {
+    let conn = open_at(dir)?;
+    if !table_exists(&conn, "chat_message")? {
+        return Ok(());
+    }
+    conn.execute("DELETE FROM chat_message WHERE id = ?1", params![id])
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+fn chat_clear_at(dir: &Path) -> Result<(), String> {
+    let conn = open_at(dir)?;
+    if !table_exists(&conn, "chat_message")? {
+        return Ok(());
+    }
+    conn.execute("DELETE FROM chat_message", [])
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn chat_append(app: tauri::AppHandle, id: String, ts: i64, payload: String) -> Result<bool, String> {
+    let dir = app_dir(&app)?;
+    chat_append_at(&dir, &id, ts, &payload)?;
+    Ok(true)
+}
+
+#[tauri::command]
+pub fn chat_load(app: tauri::AppHandle, limit: Option<usize>) -> Result<Vec<ChatStoredMessage>, String> {
+    let dir = app_dir(&app)?;
+    chat_load_at(&dir, limit.unwrap_or(300).clamp(1, 2000))
+}
+
+#[tauri::command]
+pub fn chat_delete(app: tauri::AppHandle, id: String) -> Result<bool, String> {
+    let dir = app_dir(&app)?;
+    chat_delete_at(&dir, &id)?;
+    Ok(true)
+}
+
+#[tauri::command]
+pub fn chat_clear(app: tauri::AppHandle) -> Result<bool, String> {
+    let dir = app_dir(&app)?;
+    chat_clear_at(&dir)?;
+    Ok(true)
+}
+
 #[tauri::command]
 pub fn db_init(app: tauri::AppHandle, ddl: String) -> DbInitResult {
     let dir = match app_dir(&app) {
@@ -980,6 +1070,28 @@ mod tests {
         let payload = sample_payload();
         let err = persist_payload_at(&dir, &payload).expect_err("should fail");
         assert!(err.contains("数据库尚未初始化"));
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn chat_roundtrip_persists_payload() {
+        let dir = temp_dir("chat");
+        let _ = fs::remove_dir_all(&dir);
+        let conn = open_at(&dir).expect("open");
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS chat_message (id TEXT PRIMARY KEY, ts INTEGER NOT NULL, payload TEXT NOT NULL);",
+        )
+        .expect("chat table");
+        drop(conn);
+        chat_append_at(&dir, "m1", 1000, r#"{"id":"m1","text":"你好"}"#).expect("append");
+        chat_append_at(&dir, "m2", 2000, r#"{"id":"m2","text":"在"}"#).expect("append2");
+        let loaded = chat_load_at(&dir, 10).expect("load");
+        assert_eq!(loaded.len(), 2);
+        assert_eq!(loaded[0].id, "m1");
+        chat_delete_at(&dir, "m1").expect("delete");
+        assert_eq!(chat_load_at(&dir, 10).expect("load2").len(), 1);
+        chat_clear_at(&dir).expect("clear");
+        assert!(chat_load_at(&dir, 10).expect("load3").is_empty());
         let _ = fs::remove_dir_all(&dir);
     }
 }

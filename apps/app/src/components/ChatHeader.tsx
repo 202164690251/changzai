@@ -10,10 +10,11 @@ export interface ChatHeaderProps {
   onOpenSettings: () => void;
   onRecall: () => void;
   onMemory: () => void;
+  onMood: () => void;
 }
 
 /** 52px 聊天标题栏：左边她的头像、名字、在线状态；右边「⋯」。 */
-export function ChatHeader({ her, typing, onOpenSettings, onRecall, onMemory }: ChatHeaderProps): ReactElement {
+export function ChatHeader({ her, typing, onOpenSettings, onRecall, onMemory, onMood }: ChatHeaderProps): ReactElement {
   const [menuOpen, setMenuOpen] = useState(false);
   return (
     <header className="chat-header">

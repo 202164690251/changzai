@@ -134,15 +134,15 @@ test("proactive：免打扰/预算/空闲/连续未回降频", () => {
   assert.equal(dnd.shouldSend, false);
   assert.equal(dnd.reason, "免打扰时段");
 
-  const exhausted = planProactive({ ...state, sentToday: 3, lastSentAt: BASE }, BASE);
+  const exhausted = planProactive({ ...state, dailyLimit: 3, sentToday: 3, lastSentAt: BASE }, BASE);
   assert.equal(exhausted.shouldSend, false);
 
-  const quiet = planProactive({ ...state, lastUserAt: BASE - 10 * 60_000 }, BASE);
+  const quiet = planProactive({ ...state, lastUserAt: BASE - 5_000 }, BASE);
   assert.equal(quiet.shouldSend, false);
   assert.ok(quiet.reason.includes("刚聊过"));
 
   const noReply = planProactive(
-    { ...state, consecutiveNoReply: 2, lastUserAt: BASE - 120 * 60_000, dndStart: 0, dndEnd: 0 },
+    { ...state, consecutiveNoReply: 2, lastUserAt: BASE - 120 * 60_000, dndEnabled: false },
     BASE,
   );
   assert.equal(noReply.shouldSend, false);
@@ -156,11 +156,11 @@ test("proactive：免打扰/预算/空闲/连续未回降频", () => {
 
 test("proactive：三档欲望与自定义参数可调", () => {
   const low = applyProactivePreset(DEFAULT_PROACTIVE_STATE, "low");
-  assert.equal(low.dailyLimit, 1);
-  assert.equal(low.minIdleMinutes, 180);
+  assert.equal(low.dailyLimit, 2);
+  assert.equal(low.minIdleSeconds, 120);
   assert.equal(low.desireLevel, "low");
   const high = applyProactivePreset(low, "high");
-  assert.equal(high.dailyLimit, 6);
+  assert.equal(high.dailyLimit, 16);
   assert.ok(high.triggerThreshold < low.triggerThreshold);
   const custom = applyProactivePreset(high, "custom");
   assert.equal(custom.dailyLimit, high.dailyLimit);

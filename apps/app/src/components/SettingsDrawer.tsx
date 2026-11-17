@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent, ReactElement } from "react";
-import { LLM_PROVIDERS, PROACTIVE_PRESETS, findProvider, personaHeadline, describeEmotion, weatherLabel, type EmotionState, type PersonaProfile, type ProactiveDesire, type ProactiveState } from "@changzai/core";
+import { LLM_PROVIDERS, PROACTIVE_PRESETS, findProvider, personaHeadline, describeEmotion, weatherLabel, type EmotionState, type PersonaProfile, type ProactiveDesire, type ProactiveState, type RelationshipProfile } from "@changzai/core";
 import type { ImportState } from "../hooks/useMediaImport.ts";
 import { readAvatarFile } from "../lib/avatar.ts";
 import { MAX_NAME_LENGTH, displayName, type PersonKey, type Profile } from "../lib/profile.ts";
@@ -42,6 +42,7 @@ export interface SettingsDrawerProps {
   onToggleProactive: (enabled: boolean) => void;
   onSetProactiveDesire: (level: ProactiveDesire) => void;
   onUpdateProactive: (patch: Partial<ProactiveState>) => void;
+  onPauseProactive: (minutes: number | null) => void;
   onTestProactive: () => void;
   safetyBusy: boolean;
   safetyMessage: string | null;
@@ -54,6 +55,17 @@ export interface SettingsDrawerProps {
   onDisablePin: (pin: string) => void;
   personaHistoryCount: number;
   onUpdateFacts: (facts: PersonaProfile["facts"]) => void;
+  onUpdatePersona: (patch: Partial<PersonaProfile>) => void;
+  relationship: RelationshipProfile | null;
+  relationshipBusy: boolean;
+  relationshipMessage: string | null;
+  onSaveRelationship: (profile: RelationshipProfile) => void;
+  onRebuildRelationship: () => void;
+  styleReviewEnabled: boolean;
+  styleFeedbackCount: number;
+  onToggleStyleReview: (enabled: boolean) => void;
+  onClearStyleFeedback: () => void;
+  onOpenMood: () => void;
   onRollbackPersona: () => void;
 }
 
@@ -92,6 +104,7 @@ export function SettingsDrawer({
   onToggleProactive,
   onSetProactiveDesire,
   onUpdateProactive,
+  onPauseProactive,
   onTestProactive,
   safetyBusy,
   safetyMessage,
@@ -104,6 +117,17 @@ export function SettingsDrawer({
   onDisablePin,
   personaHistoryCount,
   onUpdateFacts,
+  onUpdatePersona,
+  relationship,
+  relationshipBusy,
+  relationshipMessage,
+  onSaveRelationship,
+  onRebuildRelationship,
+  styleReviewEnabled,
+  styleFeedbackCount,
+  onToggleStyleReview,
+  onClearStyleFeedback,
+  onOpenMood,
   onRollbackPersona,
 }: SettingsDrawerProps): ReactElement {
   const herInputRef = useRef<HTMLInputElement | null>(null);
@@ -120,10 +144,30 @@ export function SettingsDrawer({
   const [pinDraft, setPinDraft] = useState("");
   const [factsDraft, setFactsDraft] = useState<PersonaProfile["facts"]>(persona?.facts ?? []);
   const [factDraft, setFactDraft] = useState("");
+  const [personaSummary, setPersonaSummary] = useState(persona?.summary ?? "");
+  const [personaBoundaries, setPersonaBoundaries] = useState((persona?.boundaries ?? []).join("\n"));
+  const [relationType, setRelationType] = useState<RelationshipProfile["type"]>(relationship?.type ?? "朋友");
+  const [relationUserName, setRelationUserName] = useState(relationship?.userName ?? "");
+  const [relationNickname, setRelationNickname] = useState(relationship?.herNicknameForUser ?? "");
+  const [relationSummary, setRelationSummary] = useState(relationship?.summary ?? "");
+  const [relationFacts, setRelationFacts] = useState((relationship?.userFacts ?? []).join("\n"));
+  const [relationNotes, setRelationNotes] = useState(relationship?.notes ?? "");
 
   useEffect(() => {
     setFactsDraft(persona?.facts ?? []);
+    setPersonaSummary(persona?.summary ?? "");
+    setPersonaBoundaries((persona?.boundaries ?? []).join("\n"));
   }, [persona]);
+
+  useEffect(() => {
+    if (!relationship) return;
+    setRelationType(relationship.type);
+    setRelationUserName(relationship.userName);
+    setRelationNickname(relationship.herNicknameForUser);
+    setRelationSummary(relationship.summary);
+    setRelationFacts(relationship.userFacts.join("\n"));
+    setRelationNotes(relationship.notes);
+  }, [relationship]);
 
   useEffect(() => {
     setProvider(llmConfig.provider);
@@ -434,6 +478,49 @@ export function SettingsDrawer({
                 </div>
               </details>
             )}
+            {persona !== null && (
+              <details className="persona-review">
+                <summary>编辑人格卡文字</summary>
+                <label className="settings-field">
+                  <span className="field-label">整体印象 / 风格总结</span>
+                  <textarea
+                    className="text-input"
+                    rows={3}
+                    value={personaSummary}
+                    onChange={(event) => setPersonaSummary(event.target.value)}
+                  />
+                </label>
+                <label className="settings-field">
+                  <span className="field-label">边界（每行一条）</span>
+                  <textarea
+                    className="text-input"
+                    rows={3}
+                    value={personaBoundaries}
+                    onChange={(event) => setPersonaBoundaries(event.target.value)}
+                  />
+                </label>
+                <div className="media-actions">
+                  <button
+                    type="button"
+                    className="btn primary"
+                    onClick={() =>
+                      onUpdatePersona({
+                        summary: personaSummary,
+                        boundaries: personaBoundaries
+                          .split("\n")
+                          .map((line) => line.trim())
+                          .filter(Boolean),
+                      })
+                    }
+                  >
+                    保存人格卡
+                  </button>
+                  <button type="button" className="btn" onClick={onOpenMood}>
+                    调整 ta 现在的状态
+                  </button>
+                </div>
+              </details>
+            )}
             <p className="settings-note">
               当前状态：{weatherLabel(emotion.weather)} · 亲近度 {emotion.closeness.toFixed(2)} · 紧张度{" "}
               {emotion.tension.toFixed(2)}
@@ -450,6 +537,132 @@ export function SettingsDrawer({
               </button>
             </div>
             {personaMessage !== null && <p className="settings-note">{personaMessage}</p>}
+          </section>
+
+          <section className="settings-section" aria-labelledby="settings-relationship">
+            <header className="settings-section-head">
+              <h3 id="settings-relationship">关系与称呼</h3>
+            </header>
+            <p className="settings-hint">
+              首次会从聊天记录自动总结一次；这里可以改成你确认的关系、她对你的称呼和关于你的事实。
+            </p>
+            {relationship !== null ? (
+              <>
+                <div className="settings-form proactive-grid">
+                  <label className="settings-field">
+                    <span className="field-label">关系</span>
+                    <select
+                      className="text-input"
+                      value={relationType}
+                      onChange={(event) => setRelationType(event.target.value as RelationshipProfile["type"])}
+                    >
+                      {["情侣", "前任", "暗恋", "朋友", "亲人", "同事", "其他"].map((type) => (
+                        <option key={type} value={type}>
+                          {type}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="settings-field">
+                    <span className="field-label">你的名字</span>
+                    <input
+                      className="text-input"
+                      value={relationUserName}
+                      onChange={(event) => setRelationUserName(event.target.value)}
+                    />
+                  </label>
+                  <label className="settings-field">
+                    <span className="field-label">她怎么叫你</span>
+                    <input
+                      className="text-input"
+                      value={relationNickname}
+                      onChange={(event) => setRelationNickname(event.target.value)}
+                    />
+                  </label>
+                </div>
+                <label className="settings-field">
+                  <span className="field-label">关系总结</span>
+                  <textarea
+                    className="text-input"
+                    rows={3}
+                    value={relationSummary}
+                    onChange={(event) => setRelationSummary(event.target.value)}
+                  />
+                </label>
+                <label className="settings-field">
+                  <span className="field-label">关于你的事实（每行一条）</span>
+                  <textarea
+                    className="text-input"
+                    rows={4}
+                    value={relationFacts}
+                    onChange={(event) => setRelationFacts(event.target.value)}
+                  />
+                </label>
+                <label className="settings-field">
+                  <span className="field-label">重要日期 / 共同经历 / 不要提的事</span>
+                  <textarea
+                    className="text-input"
+                    rows={3}
+                    value={relationNotes}
+                    onChange={(event) => setRelationNotes(event.target.value)}
+                  />
+                </label>
+                <div className="media-actions">
+                  <button
+                    type="button"
+                    className="btn primary"
+                    onClick={() =>
+                      onSaveRelationship({
+                        ...relationship,
+                        type: relationType,
+                        userName: relationUserName.trim() || "我",
+                        herNicknameForUser: relationNickname.trim() || relationUserName.trim() || "你",
+                        summary: relationSummary.trim(),
+                        userFacts: relationFacts
+                          .split("\n")
+                          .map((line) => line.trim())
+                          .filter(Boolean),
+                        notes: relationNotes.trim(),
+                        updatedAt: Date.now(),
+                      })
+                    }
+                  >
+                    保存关系卡
+                  </button>
+                  <button type="button" className="btn" disabled={relationshipBusy} onClick={onRebuildRelationship}>
+                    {relationshipBusy ? "总结中…" : "重新从记录总结"}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <button type="button" className="btn" disabled={relationshipBusy} onClick={onRebuildRelationship}>
+                {relationshipBusy ? "总结中…" : "从聊天记录生成关系卡"}
+              </button>
+            )}
+            {relationshipMessage !== null && <p className="settings-note">{relationshipMessage}</p>}
+          </section>
+
+          <section className="settings-section" aria-labelledby="settings-style-review">
+            <header className="settings-section-head">
+              <h3 id="settings-style-review">风格校准</h3>
+            </header>
+            <p className="settings-hint">
+              默认关闭。开启后只在鼠标悬停/右键消息时出现「校准」入口，不会主动弹出，也不影响聊天布局。
+            </p>
+            <label className="settings-check">
+              <input
+                type="checkbox"
+                checked={styleReviewEnabled}
+                onChange={(event) => onToggleStyleReview(event.target.checked)}
+              />
+              <span>显示风格校准入口</span>
+            </label>
+            <p className="settings-hint">已记录 {styleFeedbackCount} 条反馈；只存本机。</p>
+            {styleFeedbackCount > 0 && (
+              <button type="button" className="btn" onClick={onClearStyleFeedback}>
+                清空风格反馈
+              </button>
+            )}
           </section>
 
           <section className="settings-section" aria-labelledby="settings-media">
@@ -600,7 +813,7 @@ export function SettingsDrawer({
               <h3 id="settings-proactive">主动消息</h3>
             </header>
             <p className="settings-hint">
-              开启后，ta 会在你一段时间没说话时主动发一条。所有参数都可调；关窗到托盘后由进程内定时器继续尝试，完全退出后不补发。
+              默认关闭。开启后，ta 会在你一段时间没说话时主动发一条；关窗到托盘仍会继续，完全退出后不补发。每次主动消息都会消耗模型 token。
             </p>
             <label className="settings-check">
               <input
@@ -612,177 +825,177 @@ export function SettingsDrawer({
             </label>
 
             <label className="settings-field">
-              <span className="field-label">主动欲望</span>
+              <span className="field-label">主动程度</span>
               <select
                 className="text-input"
                 value={proactiveState.desireLevel}
                 onChange={(event) => onSetProactiveDesire(event.target.value as ProactiveDesire)}
               >
-                <option value="low">克制 · 每天最多 1 条</option>
-                <option value="medium">适中 · 每天最多 3 条</option>
-                <option value="high">黏人 · 每天最多 6 条</option>
+                <option value="low">克制 · 每天最多 2 条</option>
+                <option value="medium">日常 · 每天最多 8 条</option>
+                <option value="high">黏人 · 每天最多 16 条</option>
                 <option value="custom">自定义</option>
               </select>
             </label>
             <p className="settings-hint">
               {proactiveState.desireLevel === "custom"
-                ? "自定义：下面所有数值都由你决定。"
+                ? "自定义：时间和频率都按秒计算；上限填 0 表示不限制。"
                 : PROACTIVE_PRESETS[proactiveState.desireLevel].description}
             </p>
-
-            <div className="settings-form proactive-grid">
-              <label className="settings-field">
-                <span className="field-label">每日上限</span>
-                <input
-                  className="text-input"
-                  type="number"
-                  min={0}
-                  max={24}
-                  value={proactiveState.dailyLimit}
-                  onChange={(event) =>
-                    onUpdateProactive({ dailyLimit: Number(event.target.value), desireLevel: "custom" })
-                  }
-                />
-              </label>
-              <label className="settings-field">
-                <span className="field-label">每周上限</span>
-                <input
-                  className="text-input"
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={proactiveState.weeklyLimit}
-                  onChange={(event) =>
-                    onUpdateProactive({ weeklyLimit: Number(event.target.value), desireLevel: "custom" })
-                  }
-                />
-              </label>
-              <label className="settings-field">
-                <span className="field-label">免打扰开始（0–23）</span>
-                <input
-                  className="text-input"
-                  type="number"
-                  min={0}
-                  max={23}
-                  value={proactiveState.dndStart}
-                  onChange={(event) =>
-                    onUpdateProactive({ dndStart: Number(event.target.value), desireLevel: "custom" })
-                  }
-                />
-              </label>
-              <label className="settings-field">
-                <span className="field-label">免打扰结束（0–23）</span>
-                <input
-                  className="text-input"
-                  type="number"
-                  min={0}
-                  max={23}
-                  value={proactiveState.dndEnd}
-                  onChange={(event) =>
-                    onUpdateProactive({ dndEnd: Number(event.target.value), desireLevel: "custom" })
-                  }
-                />
-              </label>
-              <label className="settings-field">
-                <span className="field-label">最小空闲（分钟）</span>
-                <input
-                  className="text-input"
-                  type="number"
-                  min={5}
-                  max={720}
-                  value={proactiveState.minIdleMinutes}
-                  onChange={(event) =>
-                    onUpdateProactive({ minIdleMinutes: Number(event.target.value), desireLevel: "custom" })
-                  }
-                />
-              </label>
-              <label className="settings-field">
-                <span className="field-label">检查间隔（分钟）</span>
-                <input
-                  className="text-input"
-                  type="number"
-                  min={1}
-                  max={120}
-                  value={proactiveState.checkIntervalMinutes}
-                  onChange={(event) =>
-                    onUpdateProactive({ checkIntervalMinutes: Number(event.target.value), desireLevel: "custom" })
-                  }
-                />
-              </label>
-              <label className="settings-field">
-                <span className="field-label">欲望系数（0.1–2）</span>
-                <input
-                  className="text-input"
-                  type="number"
-                  min={0.1}
-                  max={2}
-                  step={0.1}
-                  value={proactiveState.desireFactor}
-                  onChange={(event) =>
-                    onUpdateProactive({ desireFactor: Number(event.target.value), desireLevel: "custom" })
-                  }
-                />
-              </label>
-              <label className="settings-field">
-                <span className="field-label">连续未回上限（1–10）</span>
-                <input
-                  className="text-input"
-                  type="number"
-                  min={1}
-                  max={10}
-                  value={proactiveState.noReplyLimit}
-                  onChange={(event) =>
-                    onUpdateProactive({ noReplyLimit: Number(event.target.value), desireLevel: "custom" })
-                  }
-                />
-              </label>
-              <label className="settings-field">
-                <span className="field-label">触发阈值（0.05–0.95）</span>
-                <input
-                  className="text-input"
-                  type="number"
-                  min={0.05}
-                  max={0.95}
-                  step={0.05}
-                  value={proactiveState.triggerThreshold}
-                  onChange={(event) =>
-                    onUpdateProactive({ triggerThreshold: Number(event.target.value), desireLevel: "custom" })
-                  }
-                />
-              </label>
-              <label className="settings-field">
-                <span className="field-label">活跃开始（0–23）</span>
-                <input
-                  className="text-input"
-                  type="number"
-                  min={0}
-                  max={23}
-                  value={proactiveState.activeStart}
-                  onChange={(event) =>
-                    onUpdateProactive({ activeStart: Number(event.target.value), desireLevel: "custom" })
-                  }
-                />
-              </label>
-              <label className="settings-field">
-                <span className="field-label">活跃结束（1–24）</span>
-                <input
-                  className="text-input"
-                  type="number"
-                  min={1}
-                  max={24}
-                  value={proactiveState.activeEnd}
-                  onChange={(event) =>
-                    onUpdateProactive({ activeEnd: Number(event.target.value), desireLevel: "custom" })
-                  }
-                />
-              </label>
-            </div>
 
             <div className="media-actions">
               <button type="button" className="btn" disabled={proactiveBusy} onClick={onTestProactive}>
                 {proactiveBusy ? "正在想说什么…" : "现在发一条试试"}
               </button>
+              <button type="button" className="btn" onClick={() => onPauseProactive(60)}>
+                暂停 1 小时
+              </button>
+              <button type="button" className="btn" onClick={() => onPauseProactive(24 * 60)}>
+                暂停 24 小时
+              </button>
+              <button type="button" className="btn" onClick={() => onPauseProactive(null)}>
+                恢复
+              </button>
             </div>
+            {proactiveState.pausedUntil > Date.now() && (
+              <p className="settings-note">已暂停到 {new Date(proactiveState.pausedUntil).toLocaleString()}</p>
+            )}
+
+            <details className="persona-review">
+              <summary>高级设置（频率按秒）</summary>
+              <div className="settings-form proactive-grid">
+                <label className="settings-field">
+                  <span className="field-label">每日上限（0=不限）</span>
+                  <input
+                    className="text-input"
+                    type="number"
+                    min={0}
+                    max={200}
+                    value={proactiveState.dailyLimit}
+                    onChange={(event) =>
+                      onUpdateProactive({ dailyLimit: Number(event.target.value), desireLevel: "custom" })
+                    }
+                  />
+                </label>
+                <label className="settings-field">
+                  <span className="field-label">每周上限（0=不限）</span>
+                  <input
+                    className="text-input"
+                    type="number"
+                    min={0}
+                    max={2000}
+                    value={proactiveState.weeklyLimit}
+                    onChange={(event) =>
+                      onUpdateProactive({ weeklyLimit: Number(event.target.value), desireLevel: "custom" })
+                    }
+                  />
+                </label>
+                <label className="settings-check">
+                  <input
+                    type="checkbox"
+                    checked={proactiveState.dndEnabled}
+                    onChange={(event) =>
+                      onUpdateProactive({ dndEnabled: event.target.checked, desireLevel: "custom" })
+                    }
+                  />
+                  <span>启用免打扰</span>
+                </label>
+                <label className="settings-field">
+                  <span className="field-label">免打扰开始（0–23）</span>
+                  <input
+                    className="text-input"
+                    type="number"
+                    min={0}
+                    max={23}
+                    value={proactiveState.dndStart}
+                    onChange={(event) =>
+                      onUpdateProactive({ dndStart: Number(event.target.value), desireLevel: "custom" })
+                    }
+                  />
+                </label>
+                <label className="settings-field">
+                  <span className="field-label">免打扰结束（0–23）</span>
+                  <input
+                    className="text-input"
+                    type="number"
+                    min={0}
+                    max={23}
+                    value={proactiveState.dndEnd}
+                    onChange={(event) =>
+                      onUpdateProactive({ dndEnd: Number(event.target.value), desireLevel: "custom" })
+                    }
+                  />
+                </label>
+                <label className="settings-field">
+                  <span className="field-label">最小空闲（秒）</span>
+                  <input
+                    className="text-input"
+                    type="number"
+                    min={1}
+                    max={86400}
+                    value={proactiveState.minIdleSeconds}
+                    onChange={(event) =>
+                      onUpdateProactive({ minIdleSeconds: Number(event.target.value), desireLevel: "custom" })
+                    }
+                  />
+                </label>
+                <label className="settings-field">
+                  <span className="field-label">检查间隔（秒）</span>
+                  <input
+                    className="text-input"
+                    type="number"
+                    min={3}
+                    max={3600}
+                    value={proactiveState.checkIntervalSeconds}
+                    onChange={(event) =>
+                      onUpdateProactive({ checkIntervalSeconds: Number(event.target.value), desireLevel: "custom" })
+                    }
+                  />
+                </label>
+                <label className="settings-field">
+                  <span className="field-label">欲望系数（0.1–2）</span>
+                  <input
+                    className="text-input"
+                    type="number"
+                    min={0.1}
+                    max={2}
+                    step={0.1}
+                    value={proactiveState.desireFactor}
+                    onChange={(event) =>
+                      onUpdateProactive({ desireFactor: Number(event.target.value), desireLevel: "custom" })
+                    }
+                  />
+                </label>
+                <label className="settings-field">
+                  <span className="field-label">触发阈值（0.02–0.95）</span>
+                  <input
+                    className="text-input"
+                    type="number"
+                    min={0.02}
+                    max={0.95}
+                    step={0.01}
+                    value={proactiveState.triggerThreshold}
+                    onChange={(event) =>
+                      onUpdateProactive({ triggerThreshold: Number(event.target.value), desireLevel: "custom" })
+                    }
+                  />
+                </label>
+                <label className="settings-field">
+                  <span className="field-label">连续未回上限（1–20）</span>
+                  <input
+                    className="text-input"
+                    type="number"
+                    min={1}
+                    max={20}
+                    value={proactiveState.noReplyLimit}
+                    onChange={(event) =>
+                      onUpdateProactive({ noReplyLimit: Number(event.target.value), desireLevel: "custom" })
+                    }
+                  />
+                </label>
+              </div>
+            </details>
+
             {proactiveReason.length > 0 && <p className="settings-note">上次判断：{proactiveReason}</p>}
           </section>
 

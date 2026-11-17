@@ -18,6 +18,7 @@ export interface PersonaApi {
   rebuildFromDb: () => Promise<void>;
   /** 审阅：保存编辑后的事实列表 */
   updateFacts: (facts: PersonaProfile["facts"]) => Promise<void>;
+  updateProfile: (patch: Partial<PersonaProfile>) => Promise<void>;
   historyCount: number;
   rollback: () => Promise<void>;
 }
@@ -131,6 +132,15 @@ export function usePersona(): PersonaApi {
     [persist, profile],
   );
 
+  const updateProfile = useCallback(
+    async (patch: Partial<PersonaProfile>): Promise<void> => {
+      if (profile === null) return;
+      await persist({ ...profile, ...patch, built_at: Date.now() });
+      setMessage("人格卡已保存；下一轮生效。");
+    },
+    [persist, profile],
+  );
+
   const rollback = useCallback(async (): Promise<void> => {
     const previous = history[history.length - 1];
     if (!previous) {
@@ -150,5 +160,5 @@ export function usePersona(): PersonaApi {
     }
   }, [history]);
 
-  return { profile, ready, busy, message, buildFromImport, rebuildFromDb, updateFacts, historyCount: history.length, rollback };
+  return { profile, ready, busy, message, buildFromImport, rebuildFromDb, updateFacts, updateProfile, historyCount: history.length, rollback };
 }

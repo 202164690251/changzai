@@ -238,6 +238,12 @@ function normalizeMediaFile(raw: unknown): ImportedMediaFile | null {
   };
 }
 
+export interface ChatStoredRow {
+  id: string;
+  ts: number;
+  payload: string;
+}
+
 export const api = {
   async appInfo(): Promise<AppInfo> {
     requireTauri();
@@ -328,6 +334,23 @@ export const api = {
     requireTauri();
     return invoke<unknown | null>("persona_load");
   },
+  async chatAppend(id: string, ts: number, payload: string): Promise<boolean> {
+    requireTauri();
+    return invoke<boolean>("chat_append", { id, ts, payload });
+  },
+  async chatLoad(limit = 300): Promise<ChatStoredRow[]> {
+    requireTauri();
+    return invoke<ChatStoredRow[]>("chat_load", { limit });
+  },
+  async chatDelete(id: string): Promise<boolean> {
+    requireTauri();
+    return invoke<boolean>("chat_delete", { id });
+  },
+  async chatClear(): Promise<boolean> {
+    requireTauri();
+    return invoke<boolean>("chat_clear");
+  },
+
   async messagesLoad(limit?: number): Promise<ImportMessageRow[]> {
     requireTauri();
     return invoke<ImportMessageRow[]>("messages_load", { limit: limit ?? null });

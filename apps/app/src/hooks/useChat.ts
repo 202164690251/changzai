@@ -20,6 +20,7 @@ import {
   type EmotionState,
   type MemoryCandidate,
   type PersonaProfile,
+  type RelationshipProfile,
 } from "@changzai/core";
 import { DEMO_VOICE_SECONDS, demoImageDataUrl, demoVoiceDataUrl } from "../lib/demoMedia.ts";
 import { formatTimeDivider } from "../lib/time.ts";
@@ -103,6 +104,10 @@ export interface ChatOptions {
   /** Step 4：当前情绪状态（由 useEmotion 持久化） */
   emotion: EmotionState;
   onEmotion: (state: EmotionState) => void;
+  dbReady?: boolean;
+  relationship?: RelationshipProfile | null;
+  styleCalibration?: string;
+  moodNote?: string;
   /** 无法回复 / 配置缺失时的提示 */
   onNotice?: (text: string) => void;
 }
@@ -139,10 +144,16 @@ export function useChat(options: ChatOptions): ChatApi {
   const counter = useRef(0);
   const replyTimer = useRef<number | null>(null);
   const recallTimestamps = useRef<number[]>([]);
+  const loadedRef = useRef(false);
+  const conversationRef = useRef<{ summary: string; topic: string; turns: number }>({
+    summary: "",
+    topic: "",
+    turns: 0,
+  });
 
   const nextId = useCallback((): string => {
     counter.current += 1;
-    return `msg-${counter.current}`;
+    return `msg-${Date.now().toString(36)}-${counter.current}`;
   }, []);
 
   const clearReplyTimer = useCallback((): void => {
@@ -158,6 +169,83 @@ export function useChat(options: ChatOptions): ChatApi {
     },
     [],
   );
+
+  const persistMessage = useCallback((message: ChatMsg): void => {
+    if (!isTauri()) return;
+    void api.chatAppend(message.id, message.ts, JSON.stringify(message)).catch(() => undefined);
+  }, []);
+
+  const deletePersisted = useCallback((id: string): void => {
+    if (!isTauri()) return;
+    void api.chatDelete(id).catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    if (!isTauri()) return;
+    let alive = true;
+    void (async () => {
+      try {
+        const [rows, conversationRaw] = await Promise.all([
+          api.chatLoad(300),
+          api.settingGet("conversation.state"),
+        ]);
+        if (!alive) return;
+        if (conversationRaw) {
+          try {
+            const parsed = JSON.parse(conversationRaw) as { summary?: string; topic?: string; turns?: number };
+            conversationRef.current = {
+              summary: typeof parsed.summary === "string" ? parsed.summary : "",
+              topic: typeof parsed.topic === "string" ? parsed.topic : "",
+              turns: typeof parsed.turns === "number" ? parsed.turns : 0,
+            };
+          } catch {
+            /* 忽略损坏摘要 */
+          }
+        }
+        if (rows.length === 0) return;
+        const loaded: ChatMsg[] = [];
+        for (const row of rows) {
+          try {
+            const parsed = JSON.parse(row.payload) as ChatMsg;
+            if (parsed && typeof parsed.id === "string" && typeof parsed.ts === "number") loaded.push(parsed);
+          } catch {
+            /* 跳过损坏的一行 */
+          }
+        }
+        if (loaded.length > 0) {
+          setMessages(loaded);
+          setUnread(0);
+          counter.current = loaded.length;
+          loadedRef.current = true;
+        }
+      } catch {
+        /* 旧库没有 chat_message 时保留演示消息 */
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // 用最近 8 条生成短摘要：控制上下文长度，同时让重启后的 ta 知道之前在聊什么
+  useEffect(() => {
+    const textMessages = messages.filter((message) => message.kind === "text");
+    if (textMessages.length < 2) return;
+    const recent = textMessages.slice(-8).map((message) => {
+      const text = message.kind === "text" ? message.text : "";
+      return `${message.from === "her" ? "ta" : "我"}：${text.slice(0, 80)}`;
+    });
+    const lastUser = [...textMessages].reverse().find((message) => message.from === "me");
+    const next = {
+      summary: recent.join("；").slice(0, 600),
+      topic: lastUser && lastUser.kind === "text" ? lastUser.text.slice(0, 40) : conversationRef.current.topic,
+      turns: textMessages.filter((message) => message.from === "me").length,
+    };
+    conversationRef.current = next;
+    if (isTauri()) {
+      void api.settingSet("conversation.state", JSON.stringify(next)).catch(() => undefined);
+    }
+  }, [messages.length]);
 
   const scheduleReply = useCallback((): void => {
     clearReplyTimer();
@@ -187,7 +275,7 @@ export function useChat(options: ChatOptions): ChatApi {
       const runtimeHistory = history
         .filter(
           (message): message is TextMessage =>
-            message.kind === "text" && message.id.startsWith("msg-") && message.from !== "system",
+            message.kind === "text" && message.from !== "system",
         )
         .map((message) => ({
           from: message.from === "her" ? ("her" as const) : ("me" as const),
@@ -219,30 +307,37 @@ export function useChat(options: ChatOptions): ChatApi {
         const first = segments[0]!;
         if (!started) {
           started = true;
-          setMessages((previous) => [
-            ...previous,
-            { id: replyId, from: "her", kind: "text", text: first, ts: Date.now() },
-          ]);
+          const reply: ChatMsg = { id: replyId, from: "her", kind: "text", text: first, ts: Date.now() };
+          setMessages((previous) => [...previous, reply]);
+          persistMessage(reply);
         } else {
           setMessages((previous) =>
             previous.map((message) =>
               message.id === replyId && message.kind === "text" ? { ...message, text: first } : message,
             ),
           );
+          persistMessage({ id: replyId, from: "her", kind: "text", text: first, ts: Date.now() });
         }
         segments.slice(1).forEach((segment, index) => {
           window.setTimeout(() => {
-            setMessages((previous) => [
-              ...previous,
-              { id: `${replyId}-s${index + 1}`, from: "her", kind: "text", text: segment, ts: Date.now() },
-            ]);
+            const message: ChatMsg = {
+              id: `${replyId}-s${index + 1}`,
+              from: "her",
+              kind: "text",
+              text: segment,
+              ts: Date.now(),
+            };
+            setMessages((previous) => [...previous, message]);
+            persistMessage(message);
           }, 350 * (index + 1));
         });
       };
       void (async () => {
         let memories: ReturnType<typeof retrieveMemories> = [];
+        const conversation = conversationRef.current;
+        const memoryQuery = [conversation.topic, userText].filter(Boolean).join(" ");
         try {
-          const hits = await api.memorySearch(userText, 20);
+          const hits = await api.memorySearch(memoryQuery, 20);
           const candidates: MemoryCandidate[] = hits.map((hit) => ({
             id: hit.id,
             text: hit.text,
@@ -250,7 +345,7 @@ export function useChat(options: ChatOptions): ChatApi {
             importance: hit.importance,
             valence: hit.valence,
           }));
-          memories = retrieveMemories(candidates, userText, nextEmotion, { topK: 5, now });
+          memories = retrieveMemories(candidates, memoryQuery, nextEmotion, { topK: 5, now });
         } catch {
           /* 记忆不可用时退化为无记忆 */
         }
@@ -262,9 +357,13 @@ export function useChat(options: ChatOptions): ChatApi {
           guard,
           memories,
           openLoops: detectOpenLoops(governorMessages.slice(-50), now),
-          summary: persona.summary,
+          summary: conversation.summary || persona.summary,
           history: runtimeHistory,
           userText,
+          relationship: options.relationship ?? undefined,
+          styleCalibration: options.styleCalibration,
+          moodNote: options.moodNote,
+          topic: conversation.topic || userText,
           profile: { name: options.herName, selfName: options.meName },
         });
 
@@ -305,7 +404,7 @@ export function useChat(options: ChatOptions): ChatApi {
           });
       })();
     },
-    [clearReplyTimer, nextId, options],
+    [clearReplyTimer, nextId, options, persistMessage],
   );
 
   const sendText = useCallback(
@@ -314,10 +413,9 @@ export function useChat(options: ChatOptions): ChatApi {
       const value = text.trim();
       if (value.length === 0) return;
       const history = messages;
-      setMessages((previous) => [
-        ...previous,
-        { id: nextId(), from: "me", kind: "text", text: value, ts: Date.now() },
-      ]);
+      const userMessage: ChatMsg = { id: nextId(), from: "me", kind: "text", text: value, ts: Date.now() };
+      setMessages((previous) => [...previous, userMessage]);
+      persistMessage(userMessage);
       setUnread(0);
       if (options.persona && options.persona.source.her_messages > 0) {
         if (llmUsable(options.llm)) {
@@ -329,31 +427,29 @@ export function useChat(options: ChatOptions): ChatApi {
       }
       scheduleReply();
     },
-    [messages, nextId, options, scheduleReply, streamReply, typing],
+    [messages, nextId, options, persistMessage, scheduleReply, streamReply, typing],
   );
 
   const sendImage = useCallback(
     (dataUrl: string, name?: string) => {
-      setMessages((previous) => [
-        ...previous,
-        { id: nextId(), from: "me", kind: "image", dataUrl, name, ts: Date.now() },
-      ]);
+      const message: ChatMsg = { id: nextId(), from: "me", kind: "image", dataUrl, name, ts: Date.now() };
+      setMessages((previous) => [...previous, message]);
+      persistMessage(message);
       setUnread(0);
     },
-    [nextId],
+    [nextId, persistMessage],
   );
 
   const appendProactive = useCallback(
     (text: string) => {
       const value = text.trim();
       if (!value) return;
-      setMessages((previous) => [
-        ...previous,
-        { id: nextId(), from: "her", kind: "text", text: value, ts: Date.now() },
-      ]);
+      const message: ChatMsg = { id: nextId(), from: "her", kind: "text", text: value, ts: Date.now() };
+      setMessages((previous) => [...previous, message]);
+      persistMessage(message);
       setUnread((previous) => previous + 1);
     },
-    [nextId],
+    [nextId, persistMessage],
   );
 
   const recallLastMessage = useCallback((): boolean => {    const now = Date.now();
@@ -373,17 +469,20 @@ export function useChat(options: ChatOptions): ChatApi {
         .settingSet("recall.timestamps", JSON.stringify(recallTimestamps.current))
         .catch(() => undefined);
     }
+    if (result.recalled) deletePersisted(result.recalled.id);
     const nextMessages = result.systemNotice
       ? [...result.messages, result.systemNotice]
       : result.messages;
     setMessages(nextMessages as unknown as ChatMsg[]);
+    if (result.systemNotice) persistMessage(result.systemNotice as unknown as ChatMsg);
     options.onNotice?.("已撤回一条消息");
     return true;
-  }, [messages, options]);
+  }, [deletePersisted, messages, options, persistMessage]);
 
   const deleteMessage = useCallback((id: string) => {
     setMessages((previous) => previous.filter((message) => message.id !== id));
-  }, []);
+    deletePersisted(id);
+  }, [deletePersisted]);
 
   const appendImported = useCallback(
     (files: ImportedMediaFile[]) => {
@@ -418,14 +517,21 @@ export function useChat(options: ChatOptions): ChatApi {
             },
       );
       setMessages((previous) => [...previous, stamp, ...imported]);
+      persistMessage(stamp);
+      imported.forEach(persistMessage);
     },
-    [clearReplyTimer, nextId],
+    [clearReplyTimer, nextId, persistMessage],
   );
 
   const clear = useCallback(() => {
     clearReplyTimer();
     setTyping(false);
     setMessages([]);
+    conversationRef.current = { summary: "", topic: "", turns: 0 };
+    if (isTauri()) {
+      void api.chatClear().catch(() => undefined);
+      void api.settingSet("conversation.state", JSON.stringify({ summary: "", topic: "", turns: 0 })).catch(() => undefined);
+    }
   }, [clearReplyTimer]);
 
   const markRead = useCallback(() => setUnread(0), []);
