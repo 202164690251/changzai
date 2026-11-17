@@ -176,6 +176,24 @@ export interface LlmChatEvent {
   text: string;
 }
 
+export interface BackupResult {
+  ok: boolean;
+  path: string;
+  message: string;
+}
+
+export interface RestoreResult {
+  ok: boolean;
+  message: string;
+  backupPath: string;
+}
+
+export interface DestroyResult {
+  ok: boolean;
+  removed: string[];
+  message: string;
+}
+
 export interface MemoryHit {
   id: string;
   text: string;
@@ -331,6 +349,18 @@ export const api = {
   async memorySearch(query: string, limit = 20): Promise<MemoryHit[]> {
     requireTauri();
     return invoke<MemoryHit[]>("memory_search", { query, limit });
+  },
+  async backupExport(passphrase: string): Promise<BackupResult> {
+    requireTauri();
+    return invoke<BackupResult>("backup_export", { passphrase });
+  },
+  async backupRestore(passphrase: string): Promise<RestoreResult> {
+    requireTauri();
+    return invoke<RestoreResult>("backup_restore", { passphrase });
+  },
+  async dataDestroy(confirm: string): Promise<DestroyResult> {
+    requireTauri();
+    return invoke<DestroyResult>("data_destroy", { confirm });
   },
   async memoryCount(): Promise<number> {
     requireTauri();

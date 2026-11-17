@@ -41,6 +41,11 @@ export interface SettingsDrawerProps {
   proactiveReason: string;
   onToggleProactive: (enabled: boolean) => void;
   onTestProactive: () => void;
+  safetyBusy: boolean;
+  safetyMessage: string | null;
+  onBackup: (passphrase: string) => void;
+  onRestore: (passphrase: string) => void;
+  onDestroy: (confirm: string) => void;
 }
 
 /** 设置抽屉：双方昵称/头像、回忆素材导入、使用说明。 */
@@ -77,6 +82,11 @@ export function SettingsDrawer({
   proactiveReason,
   onToggleProactive,
   onTestProactive,
+  safetyBusy,
+  safetyMessage,
+  onBackup,
+  onRestore,
+  onDestroy,
 }: SettingsDrawerProps): ReactElement {
   const herInputRef = useRef<HTMLInputElement | null>(null);
   const meInputRef = useRef<HTMLInputElement | null>(null);
@@ -87,6 +97,8 @@ export function SettingsDrawer({
   const [fastModel, setFastModel] = useState(llmConfig.fastModel);
   const [apiKey, setApiKey] = useState(llmConfig.apiKey);
   const [temperature, setTemperature] = useState(String(llmConfig.temperature));
+  const [backupPass, setBackupPass] = useState("");
+  const [destroyConfirm, setDestroyConfirm] = useState("");
 
   useEffect(() => {
     setProvider(llmConfig.provider);
@@ -411,6 +423,71 @@ export function SettingsDrawer({
               <li>我发出的消息：{analyticsCounts.message_me ?? 0} 条</li>
               <li>总计事件：{analyticsTotal} 条</li>
             </ul>
+          </section>
+
+          <section className="settings-section" aria-labelledby="settings-safety">
+            <header className="settings-section-head">
+              <h3 id="settings-safety">安全与备份</h3>
+            </header>
+            <p className="settings-hint">
+              所有数据只在本机。需要换电脑时用加密备份；销毁会删除数据库、密钥和素材，不承诺可恢复。
+            </p>
+            <ul className="usage-list">
+              <li>危机资源：当地急救 120 / 心理援助热线 12356（中国大陆）</li>
+              <li>如果最近情绪不好，请优先联系身边的人或专业帮助。</li>
+              <li>网络：只有你配置的模型 Base URL 会被访问，没有遥测。</li>
+            </ul>
+            <label className="settings-field">
+              <span className="field-label">备份口令（至少 6 位，勿与 Key 相同）</span>
+              <input
+                className="text-input"
+                type="password"
+                value={backupPass}
+                onChange={(event) => setBackupPass(event.target.value)}
+                placeholder="用于加密 .czbak"
+              />
+            </label>
+            <div className="media-actions">
+              <button
+                type="button"
+                className="btn"
+                disabled={safetyBusy || backupPass.trim().length < 6}
+                onClick={() => onBackup(backupPass)}
+              >
+                导出备份
+              </button>
+              <button
+                type="button"
+                className="btn"
+                disabled={safetyBusy || backupPass.trim().length < 6}
+                onClick={() => onRestore(backupPass)}
+              >
+                恢复备份
+              </button>
+            </div>
+            <label className="settings-field">
+              <span className="field-label">销毁本机数据：输入「删除」确认</span>
+              <input
+                className="text-input"
+                value={destroyConfirm}
+                onChange={(event) => setDestroyConfirm(event.target.value)}
+                placeholder="删除"
+              />
+            </label>
+            <div className="media-actions">
+              <button
+                type="button"
+                className="btn danger"
+                disabled={safetyBusy || destroyConfirm.trim() !== "删除"}
+                onClick={() => {
+                  onDestroy(destroyConfirm);
+                  setDestroyConfirm("");
+                }}
+              >
+                永久删除本机数据
+              </button>
+            </div>
+            {safetyMessage !== null && <p className="settings-message">{safetyMessage}</p>}
           </section>
 
           <section className="settings-section" aria-labelledby="settings-proactive">

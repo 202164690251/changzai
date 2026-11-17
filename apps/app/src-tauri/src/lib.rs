@@ -2,6 +2,7 @@ mod db;
 mod http_probe;
 mod llm;
 mod media;
+mod safety;
 mod store;
 mod tray;
 
@@ -85,7 +86,10 @@ pub fn run() {
             llm::llm_config_load,
             llm::llm_config_save,
             llm::llm_test,
-            llm::llm_chat_stream
+            llm::llm_chat_stream,
+            safety::backup_export,
+            safety::backup_restore,
+            safety::data_destroy
         ])
         .setup(|app| {
             // 托盘常驻：关闭窗口 = 隐藏，进程继续跑（主动消息的前提）

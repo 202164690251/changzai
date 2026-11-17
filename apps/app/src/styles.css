@@ -1579,3 +1579,123 @@ textarea:focus-visible {
   height: 16px;
   accent-color: var(--green);
 }
+/* ───────────────── Step 6：引导 / 安全 / 消息菜单 ───────────────── */
+.onboarding-root {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: radial-gradient(circle at 20% 20%, #eefbf3, #f5f5f5 60%);
+}
+.onboarding-card {
+  width: min(680px, 94vw);
+  max-height: 90vh;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-radius: 16px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.16);
+}
+.onboarding-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 22px;
+  border-bottom: 1px solid var(--border);
+}
+.onboarding-step {
+  margin-left: 10px;
+  color: var(--text-3);
+  font-size: 12px;
+}
+.onboarding-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 22px;
+}
+.onboarding-body h1 {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.4;
+}
+.onboarding-body h2 {
+  margin: 0;
+  font-size: 18px;
+}
+.onboarding-body p {
+  margin: 0;
+  color: var(--text-2);
+  line-height: 1.6;
+}
+.onboarding-foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 22px;
+  border-top: 1px solid var(--border);
+  color: var(--text-3);
+  font-size: 12px;
+}
+.message-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+}
+.message-menu {
+  position: fixed;
+  z-index: 46;
+  min-width: 96px;
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+  display: flex;
+  flex-direction: column;
+}
+.message-menu button {
+  border: 0;
+  background: transparent;
+  padding: 7px 10px;
+  border-radius: 5px;
+  text-align: left;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.message-menu button:hover {
+  background: var(--hover);
+}
+.load-older {
+  margin: 10px auto;
+  border: 0;
+  background: transparent;
+  color: var(--text-3);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.safety-banner {
+  margin: 8px 16px 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #fff7e6;
+  color: #8a5a00;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.chat-shell.night .chat-main {
+  filter: brightness(0.92) saturate(0.9);
+}
+.btn.danger {
+  color: #fff;
+  background: var(--danger);
+  border-color: var(--danger);
+}

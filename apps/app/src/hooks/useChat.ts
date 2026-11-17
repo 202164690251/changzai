@@ -116,6 +116,7 @@ export interface ChatApi {
   appendImported: (files: ImportedMediaFile[]) => void;
   appendProactive: (text: string) => void;
   recallLastMessage: () => boolean;
+  deleteMessage: (id: string) => void;
   clear: () => void;
   markRead: () => void;
 }
@@ -355,8 +356,7 @@ export function useChat(options: ChatOptions): ChatApi {
     [nextId],
   );
 
-  const recallLastMessage = useCallback((): boolean => {
-    const now = Date.now();
+  const recallLastMessage = useCallback((): boolean => {    const now = Date.now();
     const check = canRecall({ timestamps: recallTimestamps.current }, now, DEFAULT_RECALL_BUDGET);
     if (!check.ok) {
       options.onNotice?.(check.reason);
@@ -380,6 +380,10 @@ export function useChat(options: ChatOptions): ChatApi {
     options.onNotice?.("已撤回一条消息");
     return true;
   }, [messages, options]);
+
+  const deleteMessage = useCallback((id: string) => {
+    setMessages((previous) => previous.filter((message) => message.id !== id));
+  }, []);
 
   const appendImported = useCallback(
     (files: ImportedMediaFile[]) => {
@@ -436,6 +440,7 @@ export function useChat(options: ChatOptions): ChatApi {
       appendImported,
       appendProactive,
       recallLastMessage,
+      deleteMessage,
       clear,
       markRead,
     }),
@@ -448,6 +453,7 @@ export function useChat(options: ChatOptions): ChatApi {
       appendImported,
       appendProactive,
       recallLastMessage,
+      deleteMessage,
       clear,
       markRead,
     ],

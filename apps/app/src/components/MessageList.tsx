@@ -1,5 +1,5 @@
-import { Fragment, useEffect, useRef } from "react";
-import type { ReactElement } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
+import type { MouseEvent, ReactElement } from "react";
 import type { ChatMsg } from "../hooks/useChat.ts";
 import type { PersonProfile } from "../lib/profile.ts";
 import { formatTimeDivider } from "../lib/time.ts";
@@ -17,10 +17,13 @@ export interface MessageListProps {
   me: PersonProfile;
   typing: boolean;
   onPreview: (image: PreviewImage) => void;
+  onMessageMenu?: (message: ChatMsg, event: MouseEvent<HTMLDivElement>) => void;
 }
 
 /** 消息列表：浅灰底、居中时间分隔、双方头像对齐气泡顶部、自动贴底。 */
-export function MessageList({ messages, her, me, typing, onPreview }: MessageListProps): ReactElement {
+export function MessageList({ messages, her, me, typing, onPreview, onMessageMenu }: MessageListProps): ReactElement {
+  const [visibleCount, setVisibleCount] = useState(200);
+  const visible = messages.slice(-visibleCount);
   const listRef = useRef<HTMLDivElement | null>(null);
   const innerRef = useRef<HTMLDivElement | null>(null);
   const pinnedRef = useRef(true);
@@ -54,8 +57,18 @@ export function MessageList({ messages, her, me, typing, onPreview }: MessageLis
       <div className="message-list-inner" ref={innerRef}>
         {messages.length === 0 && !typing && <p className="chat-empty">还没有开始</p>}
 
-        {messages.map((message, index) => {
-          const previous = index > 0 ? messages[index - 1] : undefined;
+        {messages.length > visible.length && (
+          <button
+            type="button"
+            className="load-older"
+            onClick={() => setVisibleCount((count) => count + 200)}
+          >
+            加载更早的消息
+          </button>
+        )}
+
+        {visible.map((message, index) => {
+          const previous = index > 0 ? visible[index - 1] : undefined;
           const needsDivider =
             message.from !== "system" && (!previous || message.ts - previous.ts >= TIME_GAP_MS);
 
@@ -65,7 +78,7 @@ export function MessageList({ messages, her, me, typing, onPreview }: MessageLis
               {message.from === "system" ? (
                 <div className="msg-system">{message.text}</div>
               ) : (
-                <MessageRow message={message} her={her} me={me} onPreview={onPreview} />
+                <MessageRow message={message} her={her} me={me} onPreview={onPreview} onMessageMenu={onMessageMenu} />
               )}
             </Fragment>
           );
@@ -93,9 +106,10 @@ interface MessageRowProps {
   her: PersonProfile;
   me: PersonProfile;
   onPreview: (image: PreviewImage) => void;
+  onMessageMenu?: (message: ChatMsg, event: MouseEvent<HTMLDivElement>) => void;
 }
 
-function MessageRow({ message, her, me, onPreview }: MessageRowProps): ReactElement {
+function MessageRow({ message, her, me, onPreview, onMessageMenu }: MessageRowProps): ReactElement {
   const mine = message.from === "me";
   const person = mine ? me : her;
   const side = mine ? "me" : "her";
@@ -110,7 +124,13 @@ function MessageRow({ message, her, me, onPreview }: MessageRowProps): ReactElem
   }
 
   return (
-    <div className={`msg-row ${side}`}>
+    <div
+      className={`msg-row ${side}`}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        onMessageMenu?.(message, event);
+      }}
+    >
       <Avatar className="msg-avatar" name={person.name} src={person.avatar} size={40} />
       <div className="msg-content">{bubble}</div>
     </div>
