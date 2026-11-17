@@ -8,4 +8,5 @@ export * from "./ingest/burst.ts";
 export * from "./ingest/report.ts";
 export * from "./ingest/adapters/base.ts";
 export * from "./ingest/adapters/plaintext.ts";
+export * from "./media/index.ts";
 export * from "./db/ddl.ts";

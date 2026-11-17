@@ -17,7 +17,7 @@ import { computeBursts, computeLatency, fillBehaviorSignals } from "../src/inges
 import { buildHealthReport, fidelityScore, fidelityLevel, findGaps } from "../src/ingest/report.ts";
 import { PlaintextPasteAdapter } from "../src/ingest/adapters/plaintext.ts";
 import { AdapterRegistry } from "../src/ingest/adapters/base.ts";
-import { DDL_V1, SCHEMA_VERSION } from "../src/db/ddl.ts";
+import { DDL_V2, SCHEMA_VERSION } from "../src/db/ddl.ts";
 
 const T = (iso: string): number => new Date(iso).getTime();
 
@@ -183,14 +183,17 @@ test("findGaps：超过 30 天的记录空洞", () => {
   assert.match(gaps[0] ?? "", /2023-05 至 2023-08/);
 });
 
-test("DDL v1 包含 trigram、FTS 同步触发器、correction、holdout", () => {
-  assert.equal(SCHEMA_VERSION, 1);
-  assert.match(DDL_V1, /tokenize='trigram'/);
-  assert.match(DDL_V1, /CREATE TRIGGER IF NOT EXISTS memory_ai/);
-  assert.match(DDL_V1, /CREATE TRIGGER IF NOT EXISTS memory_ad/);
-  assert.match(DDL_V1, /CREATE TRIGGER IF NOT EXISTS memory_au/);
-  assert.match(DDL_V1, /CREATE TABLE IF NOT EXISTS correction/);
-  assert.match(DDL_V1, /is_holdout INTEGER/);
-  assert.match(DDL_V1, /relationship/);
-  assert.match(DDL_V1, /ingest_job/);
+test("DDL v2 包含 trigram、FTS 同步触发器、correction、holdout、profile、media", () => {
+  assert.equal(SCHEMA_VERSION, 2);
+  assert.match(DDL_V2, /tokenize='trigram'/);
+  assert.match(DDL_V2, /CREATE TRIGGER IF NOT EXISTS memory_ai/);
+  assert.match(DDL_V2, /CREATE TRIGGER IF NOT EXISTS memory_ad/);
+  assert.match(DDL_V2, /CREATE TRIGGER IF NOT EXISTS memory_au/);
+  assert.match(DDL_V2, /CREATE TABLE IF NOT EXISTS correction/);
+  assert.match(DDL_V2, /is_holdout INTEGER/);
+  assert.match(DDL_V2, /relationship/);
+  assert.match(DDL_V2, /ingest_job/);
+  assert.match(DDL_V2, /CREATE TABLE IF NOT EXISTS profile/);
+  assert.match(DDL_V2, /CREATE TABLE IF NOT EXISTS media/);
+  assert.match(DDL_V2, /avatar_path TEXT/);
 });

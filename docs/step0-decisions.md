@@ -47,12 +47,25 @@
 | 包管理 | pnpm workspace（42 号机用 bundled pnpm 11） | 已确认 |
 | Node | 20+（本机用 bundled Node 24） | 已确认 |
 | 语言 | 全 TypeScript + Rust 宿主 | 已确认 |
-| 数据库 | SQLite + SQLCipher（Windows：rusqlite bundled） | Step 1 验证中 |
-| 中文检索 | FTS5 trigram（unicode61 不可用，见 spike） | Step 1 验证中 |
-| 全文索引同步 | external-content 表必须配 INSERT/UPDATE/DELETE 触发器 | Step 1 验证中 |
+| 数据库 | SQLite + **SQLCipher 整库加密**（默认 `sqlcipher-system`，链接预编译 OpenSSL 3.5；`env.ps1` 自动设置 `OPENSSL_DIR`） | ✅ Step 1 已验证 |
+| 数据库（自包含备选） | `sqlcipher-vendored`：Strawberry Perl 5.42.3 + NASM 2.16.03 已安装；构建较慢，发布时可不依赖外部 OpenSSL DLL | ✅ 工具链已备 |
+| 中文检索 | FTS5 trigram（unicode61 不可用，见 spike） | ✅ 已验证 |
+| 全文索引同步 | external-content 表必须配 INSERT/UPDATE/DELETE 触发器 | ✅ 已验证 |
+| 媒体 | 图片/语音导入进 MVP（T35）：Rust `import_media_files` + `media` 表 + dataUrl 预览 | ✅ UI 链路已实现，按 msg_id 入库待 Step 2 |
+| 双方资料 | 昵称/头像自定义：Step 1 先 localStorage（key `changzai.profile.v1`）；`profile` 表 DDL 已就绪 | ✅ 计划内 |
 | 模型接入 | OpenAI 兼容，Rust 侧请求（避开 CORS） | 待 Step 5 |
 | Key 存储 | Windows 凭据管理器（keyring） | 待 Step 2 |
 | 日志 | 本地脱敏，7 天轮转，不上传 | 待 Step 2 |
+
+## 4.1 2026-11-17 产品/UI 变更（已确认）
+
+| # | 变更 | 影响 |
+|---|---|---|
+| 1 | 聊天界面以**微信 Windows 桌面版**为基准：三栏布局、双方头像（她左/我右）、气泡配色、输入工具栏、会话列表 | `apps/app/src/**` UI 重做；参考 `docs/assets/step1-shell.png` |
+| 2 | **移除每条消息的「AI」气泡角标**；改为在「设置 → 使用说明」与首启说明中披露 | ⚠️ 与 `01-competitor-and-compliance.md` §8「每条 AI 消息常驻标识」存在冲突；公开分发前需律师确认，或增加非侵入式标识（窗口标题/关于页常驻说明/导出水印） |
+| 3 | **移除主界面的技术自检面板**；改为开发页 `#/dev` 或 `Ctrl+Shift+D` | 主界面保持干净；调试能力保留 |
+| 4 | 图片/语音素材导入、双方昵称/头像自定义 | 已进 MVP 范围；Step 2 接真实聊天记录媒体 |
+| 5 | 多人协作：GitHub 仓库 + `main` 保护 + PR 流程 + CI | 见 `CONTRIBUTING.md` 与仓库 `.github/` |
 
 ## 5. 本机网络基线（影响构建）
 
@@ -61,12 +74,14 @@
 | npm registry | `https://registry.npmmirror.com`（`.npmrc`） |
 | Cargo 镜像 | `sparse+https://rsproxy.cn/index/`（全局 `~/.cargo/config.toml`） |
 | Rustup 镜像 | `RUSTUP_DIST_SERVER=https://rsproxy.cn` |
-| 直连受限 | `registry.npmjs.org` / `crates.io` / `static.crates.io` 超时；GitHub 可访问 |
+| GitHub release 资产 | 直连超时；用 `gh-proxy.com` / `ghproxy.net` 代理（Tauri 打包与 Strawberry Perl 下载均已验证） |
+| 直连受限 | `registry.npmjs.org` / `crates.io` / `static.crates.io` 超时；GitHub 页面可访问 |
 
 ## 6. 待办（Step 0 剩余）
 
 - [ ] 采购 Windows OV 代码签名证书（1–2 周）
 - [ ] 用真实微信记录完成一次导出，确认文字/图片/语音可得性（见 `step0-data-export-guide.md`）
-- [ ] 冻结高保真设计稿（聊天壳 / 引导 / 设置），当前只有 token 与线框（见 `step0-design-baseline.md`）
+- [ ] 冻结高保真设计稿（聊天壳 / 引导 / 设置），当前按微信桌面版重做中
 - [ ] 建立 holdout 并封存（见 `step0-holdout-protocol.md`）
 - [ ] 确认上表所有「待确认」项
+- [ ] 邀请协作者并为 `main` 配置分支保护（见 `CONTRIBUTING.md`）

@@ -6,7 +6,7 @@ export const APP = {
   englishName: "Still Here",
   version: "0.1.0",
   identifier: "com.changzai.stillhere",
-  schemaVersion: 1,
+  schemaVersion: 2,
 } as const;
 
 /** 24 个情绪标签（02 §5.2） */
@@ -30,9 +30,24 @@ export const INGEST = {
   maxNightHourExclusive: 2,
 } as const;
 
-/** AI 标识文案（不可关闭） */
-export const AI_BADGE = {
-  label: "AI",
-  ariaLabel: "AI 生成内容",
-  tooltip: "这是 AI 模拟生成的内容，不是真人",
+/** 媒体导入限制（与 Rust media.rs 保持一致） */
+export const MEDIA = {
+  maxFilesPerImport: 20,
+  maxBytesPerFile: 32 * 1024 * 1024,
+  imageExts: ["png", "jpg", "jpeg", "gif", "webp", "bmp"],
+  voiceExts: ["mp3", "wav", "m4a", "aac", "ogg", "opus", "amr", "silk"],
+} as const;
+
+/** 资料默认值（与 UI 默认 demo 一致） */
+export const DEFAULT_PROFILES = {
+  her: { name: "小林", avatar: null },
+  me: { name: "我", avatar: null },
+} as const;
+
+/** AI 披露文案（按产品要求：不做每条气泡角标，放在使用说明/关于页） */
+export const AI_DISCLOSURE = {
+  short: "这里的消息由 AI 模拟生成，不是真人。",
+  long:
+    "「常在」会用你导入的聊天记录模拟对方说话，所有消息都由 AI 生成，不是真人发送，也不代表对方本人。" +
+    "产品不做对外发送、不上传云端。如果最近情绪不好，请优先联系身边的人或专业帮助。",
 } as const;

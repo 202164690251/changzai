@@ -92,3 +92,56 @@ export interface Progress {
   total?: number;
   message?: string;
 }
+
+/* ───────────────────────── 媒体（图片 / 语音 / 文件） ───────────────────────── */
+
+export type MediaKind = "image" | "voice" | "file";
+
+/** 媒体导入结果（Rust 命令 import_media_files 返回；前端直接渲染 dataUrl） */
+export interface MediaFile {
+  name: string;
+  path: string;
+  size: number;
+  kind: MediaKind;
+  dataUrl: string;
+}
+
+export interface MediaImportResult {
+  ok: boolean;
+  files: MediaFile[];
+  message: string;
+}
+
+/** 媒体记录（存入 media 表；Step 2 接导入管线） */
+export interface MediaRecord {
+  id: string;
+  personaId: string;
+  msgId: string | null;
+  kind: MediaKind;
+  path: string;
+  mime: string;
+  bytes: number;
+  durationMs: number | null;
+  createdAt: number;
+}
+
+/* ───────────────────────── 双方资料（昵称 / 头像） ───────────────────────── */
+
+export interface Profile {
+  id: "me" | "her";
+  displayName: string;
+  /** 本地头像文件路径；null = 用默认字母头像 */
+  avatarPath: string | null;
+  updatedAt: number;
+}
+
+/** 前端本地资料（头像暂存 dataUrl，避免 Step 1 就依赖文件协议） */
+export interface LocalProfileSide {
+  name: string;
+  avatar: string | null;
+}
+
+export interface LocalProfiles {
+  her: LocalProfileSide;
+  me: LocalProfileSide;
+}

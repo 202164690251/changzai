@@ -58,7 +58,52 @@ if (Test-Path (Join-Path $cargoBin 'cargo.exe')) {
 $env:RUSTUP_DIST_SERVER = 'https://rsproxy.cn'
 $env:RUSTUP_UPDATE_ROOT = 'https://rsproxy.cn/rustup'
 
-# ---------- 4) MSVC（VC++ 工具链 + Windows SDK） ----------
+# ---------- 4) Perl + NASM（SQLCipher 的 vendored OpenSSL 构建需要） ----------
+$perlCandidates = @(@(
+    'D:\tools\strawberry\perl\bin',
+    'C:\Strawberry\perl\bin',
+    'C:\Program Files\Git\usr\bin'
+) | Where-Object { Test-Path (Join-Path $_ 'perl.exe') })
+if ($perlCandidates.Count -gt 0) {
+    $perlDir = $perlCandidates[0]
+    if (($env:PATH -split ';') -notcontains $perlDir) { $env:PATH = "$perlDir;$env:PATH" }
+    $env:CHANGZAI_PERL = (Join-Path $perlDir 'perl.exe')
+} else {
+    Write-Warning '未找到 Perl（SQLCipher/OpenSSL 构建会失败；可安装 Strawberry Perl）'
+}
+
+$nasmCandidates = @(@(
+    'D:\tools\nasm-2.16.03',
+    'C:\Program Files\NASM',
+    (Join-Path $env:LOCALAPPDATA 'NASM')
+) | Where-Object { Test-Path (Join-Path $_ 'nasm.exe') })
+if ($nasmCandidates.Count -gt 0) {
+    $nasmDir = $nasmCandidates[0]
+    if (($env:PATH -split ';') -notcontains $nasmDir) { $env:PATH = "$nasmDir;$env:PATH" }
+    $env:CHANGZAI_NASM = (Join-Path $nasmDir 'nasm.exe')
+} else {
+    Write-Warning '未找到 NASM（SQLCipher/OpenSSL 构建会失败）'
+}
+
+# ---------- 5) 预编译 OpenSSL（SQLCipher 默认走 sqlcipher-system，需 OPENSSL_DIR） ----------
+$opensslCandidates = @(@(
+    'D:\tools\openssl\x64',
+    'C:\Program Files\OpenSSL-Win64',
+    'C:\Program Files\OpenSSL-Win32'
+) | Where-Object { Test-Path (Join-Path $_ 'include\openssl\ssl.h') })
+if ($opensslCandidates.Count -gt 0) {
+    $opensslDir = $opensslCandidates[0]
+    if (-not $env:OPENSSL_DIR) { $env:OPENSSL_DIR = $opensslDir }
+    $opensslBin = Join-Path $opensslDir 'bin'
+    if ((Test-Path $opensslBin) -and (($env:PATH -split ';') -notcontains $opensslBin)) {
+        $env:PATH = "$opensslBin;$env:PATH"
+    }
+    $env:CHANGZAI_OPENSSL_DIR = $opensslDir
+} else {
+    Write-Warning '未找到预编译 OpenSSL（sqlcipher-system 构建会失败）；可下载 FireDaemon OpenSSL 解压到 D:\tools\openssl 或安装 Win64 OpenSSL'
+}
+
+# ---------- 6) MSVC（VC++ 工具链 + Windows SDK） ----------
 $vcvars = $null
 $vswhere = 'C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe'
 if (Test-Path $vswhere) {
@@ -83,11 +128,21 @@ if ($vcvars) {
     Write-Warning '未找到 VC++ 工具链（vcvars64.bat），Rust/MSVC 构建会失败。'
 }
 
+# ---------- 6) 非 ASCII 路径保护 ----------
+# Rust/OpenSSL(nmake)/NSIS 对中文路径支持不稳定；仓库路径含中文时强制把 Cargo target 放到 ASCII 目录。
+if ($repoRoot -match '[^\x00-\x7F]') {
+    if (-not $env:CARGO_TARGET_DIR) {
+        $asciiTarget = Join-Path $env:LOCALAPPDATA 'changzai-target'
+        $env:CARGO_TARGET_DIR = $asciiTarget
+        Write-Host "[env] 非 ASCII 仓库路径，CARGO_TARGET_DIR=$asciiTarget"
+    }
+}
+
 Set-Location $repoRoot
 if ($env:CHANGZAI_ENV_QUIET -ne '1') {
     $nodeVer = (& node -v) 2>$null
     $rustVer = (& rustc -V) 2>$null
     $clOk = [bool](Get-Command cl.exe -ErrorAction SilentlyContinue)
     Write-Host "[env] repo=$repoRoot"
-    Write-Host "[env] node=$nodeVer rust=$rustVer msvc=$clOk"
+    Write-Host "[env] node=$nodeVer rust=$rustVer msvc=$clOk perl=$($env:CHANGZAI_PERL) nasm=$($env:CHANGZAI_NASM)"
 }

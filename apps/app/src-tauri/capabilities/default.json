@@ -3,5 +3,5 @@
   "identifier": "default",
   "description": "常在主窗口默认能力",
   "windows": ["main"],
-  "permissions": ["core:default", "notification:default"]
+  "permissions": ["core:default", "notification:default", "dialog:default"]
 }

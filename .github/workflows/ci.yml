@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  web:
+    name: web
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NPM_CONFIG_REGISTRY: https://registry.npmjs.org
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Typecheck (app)
+        run: pnpm --filter @changzai/app exec tsc --noEmit
+      - name: Typecheck (core + shared)
+        run: pnpm exec tsc -p packages/core/tsconfig.json --noEmit
+      - name: Core unit tests (Node 24 native TS)
+        shell: bash
+        run: |
+          set -e
+          for f in packages/core/test/*.test.ts; do
+            echo "== $f"
+            node --test "$f"
+          done
+      - name: Web build
+        run: pnpm --filter @changzai/app build
+
+  rust:
+    name: rust
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Ensure OpenSSL (sqlcipher-system)
+        shell: pwsh
+        run: |
+          $candidates = @('C:\Program Files\OpenSSL-Win64', 'C:\Program Files\OpenSSL-Win32')
+          $dir = $candidates | Where-Object { Test-Path (Join-Path $_ 'include\openssl\ssl.h') } | Select-Object -First 1
+          if (-not $dir) {
+            choco install openssl -y --no-progress
+            $dir = $candidates | Where-Object { Test-Path (Join-Path $_ 'include\openssl\ssl.h') } | Select-Object -First 1
+          }
+          if (-not $dir) { throw 'OpenSSL not found after install' }
+          "OPENSSL_DIR=$dir" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Join-Path $dir 'bin' | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+          Write-Host "OpenSSL: $dir"
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/app/src-tauri -> target
+      - name: Cargo tests (SQLCipher + FTS5 + encryption probes)
+        working-directory: apps/app/src-tauri
+        run: cargo test --lib
+        env:
+          RUST_BACKTRACE: 1

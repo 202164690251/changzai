@@ -1,18 +1,18 @@
-// 常在 · SQLite / SQLCipher DDL v1（02 §3.2 + Step 0/1 增补）
+// 常在 · SQLite / SQLCipher DDL v2（02 §3.2 + Step 1/2 增补）
 // 说明：
 //  1) 实际建库由 Rust 侧执行：PRAGMA key 后再执行本 DDL；
 //  2) FTS5 必须用 trigram 分词（默认 unicode61 对中文几乎无效），并配 external-content 同步触发器；
 //  3) 所有 SQL 带 IF NOT EXISTS，迁移脚本按 user_version 逐步执行。
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
-export const DDL_V1 = `
+export const DDL_V2 = `
 -- 元信息
 CREATE TABLE IF NOT EXISTS schema_meta (
   k TEXT PRIMARY KEY,
   v TEXT NOT NULL
 );
-INSERT OR REPLACE INTO schema_meta(k, v) VALUES ('schema_version', '1');
+INSERT OR REPLACE INTO schema_meta(k, v) VALUES ('schema_version', '2');
 
 -- 会话与角色
 CREATE TABLE IF NOT EXISTS persona (
@@ -21,11 +21,20 @@ CREATE TABLE IF NOT EXISTS persona (
   slug TEXT,
   created_at INTEGER,
   status TEXT DEFAULT 'active',            -- active | archived
+  avatar_path TEXT,                        -- 她的头像（本地文件）；NULL = 默认头像
   style_card_json TEXT,
   persona_graph_json TEXT,
   baseline_json TEXT,
   fidelity_score REAL,
   version INTEGER DEFAULT 1
+);
+
+-- 双方资料（我的昵称/头像；她的一侧复用 persona.name/avatar_path）
+CREATE TABLE IF NOT EXISTS profile (
+  id TEXT PRIMARY KEY,                     -- me | her
+  display_name TEXT,
+  avatar_path TEXT,
+  updated_at INTEGER
 );
 
 -- 消息（原样保留，永不修改；recalled=1 不参与上下文与记忆）
@@ -51,6 +60,21 @@ CREATE TABLE IF NOT EXISTS message (
 CREATE INDEX IF NOT EXISTS idx_msg_ts ON message(persona_id, ts);
 CREATE INDEX IF NOT EXISTS idx_msg_ep ON message(episode_id);
 CREATE INDEX IF NOT EXISTS idx_msg_holdout ON message(is_holdout);
+
+-- 媒体资产（图片/语音/文件；Step 2 按 msg_id 关联）
+CREATE TABLE IF NOT EXISTS media (
+  id TEXT PRIMARY KEY,
+  persona_id TEXT,
+  msg_id TEXT,
+  kind TEXT,              -- image | voice | file
+  path TEXT,              -- 本地文件路径（绝对或相对数据目录）
+  mime TEXT,
+  bytes INTEGER,
+  duration_ms INTEGER,    -- 语音时长
+  created_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_media_msg ON media(msg_id);
+CREATE INDEX IF NOT EXISTS idx_media_persona ON media(persona_id);
 
 -- 情节（一次情绪事件，检索与弧线的基本单位）
 CREATE TABLE IF NOT EXISTS episode (

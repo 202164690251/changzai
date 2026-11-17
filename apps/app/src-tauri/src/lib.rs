@@ -1,11 +1,13 @@
 mod db;
 mod http_probe;
+mod media;
 mod tray;
 
 use serde::Serialize;
 use tauri::WindowEvent;
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct AppInfo {
     version: String,
     tauri_version: String,
@@ -56,11 +58,13 @@ fn notify_probe(app: tauri::AppHandle, title: String, body: String) -> NotifyPro
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             app_info,
             notify_probe,
             db::db_probe,
-            http_probe::http_stream_probe
+            http_probe::http_stream_probe,
+            media::import_media_files
         ])
         .setup(|app| {
             // 托盘常驻：关闭窗口 = 隐藏，进程继续跑（主动消息的前提）

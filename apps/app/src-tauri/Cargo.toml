@@ -10,29 +10,37 @@ rust-version = "1.77"
 name = "changzai_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+[features]
+# 默认：系统/预编译 OpenSSL（设置 OPENSSL_DIR；编译快，CI 用这个）
+default = ["sqlcipher-system"]
+sqlcipher-system = ["rusqlite/bundled-sqlcipher"]
+# 备选：vendored OpenSSL（需要 Perl + NASM；自包含，发布时不需要额外 OpenSSL DLL）
+# 用法：cargo build --no-default-features --features sqlcipher-vendored
+sqlcipher-vendored = ["rusqlite/bundled-sqlcipher-vendored-openssl"]
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
 tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-notification = "2"
+tauri-plugin-dialog = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
-# 数据库：
-# 本机 Step 1 使用 plain SQLite + 应用层 AES-256-GCM 封装做加密 spike。
-# SQLCipher 需要 Perl + NASM + OpenSSL，本机暂缺，切换方式见 docs/step1-spike-report.md：
-# rusqlite = { version = "0.32", features = ["bundled-sqlcipher-vendored-openssl"] }
-rusqlite = { version = "0.32", features = ["bundled"] }
+# 数据库：SQLCipher（整库加密）。构建方式见上方 [features]。
+rusqlite = { version = "0.32", default-features = false }
 
-# 加密原语（纯 Rust，无需 OpenSSL）
+# 加密原语（用于导出包/字段级加密）
 aes-gcm = "0.10"
 argon2 = "0.5"
 rand = "0.8"
+base64 = "0.22"
 
 # Rust 侧流式 HTTP（后续模型调用复用）
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream"] }
 futures-util = "0.3"
+tokio = { version = "1", features = ["sync"] }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }

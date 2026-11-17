@@ -9,14 +9,14 @@
 |---|---|---|---|
 | 0 | 环境探测 | ✅ 通过 | Node 24.21.0 / Rust 1.100.0 / MSVC 14.44 / WebView2 157.0.4341.46 / Win11 | `spikes/results/env.json` |
 | 1 | 四端空壳 → **PC 单端主体** | ✅ 通过（Tauri 2 桌面壳可构建，见 §4） | `apps/app` + `src-tauri` |
-| 2 | SQLCipher（Windows） | ⚠️ **本机阻塞**：缺 Perl + NASM + OpenSSL，`bundled-sqlcipher-vendored-openssl` 无法编译 | `src-tauri/Cargo.toml` 注释 + §3 |
-| 2b | 加密回退方案 | ✅ 通过：SQLite + **Argon2id + AES-256-GCM**（应用层封装），文件头/明文校验/错误口令拒绝 | 应用内「SQLCipher + FTS5」自检 |
+| 2 | SQLCipher（Windows） | ✅ **通过**：整库加密、文件头不可读、错误口令被拒；工具链 Strawberry Perl 5.42.3 + NASM 2.16.03 + MSVC | `cargo test --lib` → `db_probe_passes` |
+| 2b | 导出包加密 | ✅ 通过：**Argon2id + AES-256-GCM**（导出/迁移包封装），明文不落盘、错误口令被拒 | `db_probe_passes`（`export_aes256gcm_argon2id` step） |
 | 3 | FTS5 中文检索 | ✅ 通过：**trigram recall@5 = 100%**，unicode61 = 0%；external-content 必须配同步触发器 | `spikes/results/fts5-zh.json` |
-| 4 | Rust 侧流式 HTTP | ✅ 通过：本地 chunked echo 流式读取；Node 侧 SSE 解析 19 chunk / 首 chunk 136ms / 取消正常 | `spikes/results/http-stream.json` |
+| 4 | Rust 侧流式 HTTP | ✅ 通过：本地 chunked echo 流式读取；Node 侧 SSE 解析 19 chunk / 首 chunk <150ms / 取消正常 | `spikes/results/http-stream.json` |
 | 5 | 托盘 + Windows 通知 | ✅ 通过（能力验证）：Toast 提交成功；托盘需在应用运行时验证（已实现） | `spikes/results/toast.json` |
 | 6 | WebView2 | ✅ 通过：已安装 157.0.4341.46 | `spikes/results/webview2.json` |
 | 7 | Windows 构建产物 | ✅ `changzai.exe`（release，14.3MB）+ **NSIS 安装包 5.36MB** | `release/Changzai_0.1.0_x64-setup.exe` |
-| 8 | 核心单测 | ✅ 11/11 通过 | `node --test packages/core/test/*.test.ts` |
+| 8 | 核心单测 | ✅ 19/19 通过（ingest 11 + media 8） | `node --test packages/core/test/*.test.ts` |
 
 ## 2. 环境事实（影响后续决策）
 
@@ -27,30 +27,44 @@
 | pnpm | 11.28.5（bundled） | `allowBuilds` 写在 `pnpm-workspace.yaml`（pnpm 11 不再读 package.json 的 pnpm 字段） |
 | Rust | 1.100.0 stable-msvc（镜像 rsproxy.cn 安装） | 可用 |
 | MSVC | VS 2022 Community（14.44.35207）+ Win SDK 10.0.26100 | 可用（`vcvars64.bat` 由 `scripts/env.ps1` 自动加载） |
-| Perl / NASM / OpenSSL | **缺失** | SQLCipher vendored-OpenSSL 阻塞（见 §3） |
+| Perl / NASM / OpenSSL | **预编译 OpenSSL 3.5**（`D:\tools\openssl\x64`，FireDaemon 发行版）作为默认；**Strawberry Perl 5.42.3 + NASM 2.16.03** 已安装，供 `sqlcipher-vendored` 备选 | `env.ps1` 自动探测；默认 `sqlcipher-system`（见 §3） |
 | WebView2 | 157.0.4341.46 | 可用；老 Win10 用安装包内置 Bootstrapper 兜底 |
 | npm / cargo 网络 | 直连 npmjs/crates.io 超时；npmmirror、rsproxy、GitHub 可用 | 已配置 `.npmrc` 与 `~/.cargo/config.toml` 镜像 |
 | 磁盘 | D: 剩余 302GB | 充足 |
 
-## 3. SQLCipher 阻塞与处理（Step 1 最重要的一条负面结论）
+## 3. SQLCipher：从阻塞到启用（Step 1 最重要的一条技术决策）
 
-**现象**：`rusqlite` 的 `bundled-sqlcipher-vendored-openssl` 需要从源码编译 OpenSSL；本机缺 **Perl** 与 **NASM**，OpenSSL 构建无法完成。这不是代码问题，而是工具链前置条件问题。
+**过程（按时间顺序）**：
+1. 最初 `bundled-sqlcipher-vendored-openssl` 因缺 Perl/NASM 无法编译；
+2. 尝试 Git 自带 Perl（5.38）失败：缺少 `Locale::Maketext::Simple` 等模块；
+3. 安装 **Strawberry Perl 5.42.3 便携版** + **NASM 2.16.03**（GitHub 代理镜像下载，约 15 秒），并改用 ASCII 的 Cargo target 目录（中文路径会让 OpenSSL 的 nmake 构建失败）；
+4. vendored 构建能启动，但在本机单线程 nmake + 杀软环境下极慢（15 分钟仅完成 ~56 个对象），继续等会拖住交付；
+5. **最终采用预编译 OpenSSL**（FireDaemon OpenSSL 3.5，40MB，含 `include/` 与 MSVC 导入库 `libcrypto.lib` / `libssl.lib`），切到 `sqlcipher-system` 作为默认构建。
 
-**当前处理**（已实现并纳入 Step 1 交付）：
-- Step 1 先验证「plain SQLite + 应用层加密」回退方案：Argon2id 派生密钥 → AES-256-GCM 封装 → 写入文件；校验：文件头 magic、明文不出现在密文、正确口令可解、错误口令被拒。
-- 该方案满足“数据落盘加密”的最小验证，但**不等价于 SQLCipher**：SQLCipher 能保护整库页面/索引/临时文件，应用层加密只保护被显式封装的字段/记录。用于 Step 1 spike 可以，**Step 6 正式版前必须回到 SQLCipher 或明确接受回退方案的风险**。
+**结果**：SQLCipher 探针全部通过（`cargo test --lib`，详见 §4.1）：
+1. `sqlcipher_open_write_reopen`：`PRAGMA key` 建库、写入、关闭、正确口令重开可读；
+2. `sqlcipher_header_encrypted`：DB 文件前 16 字节不是 SQLite 明文头（`SQLite format 3\0`），说明整库已加密；
+3. `sqlcipher_wrong_key_rejected`：错误口令被拒；
+4. `fts5_trigram_zh`：加密库内 FTS5 trigram 中文检索命中；
+5. `export_aes256gcm_argon2id`：Argon2id + AES-256-GCM 导出包加密（附加能力，未来端间迁移复用）。
 
-**切换到 SQLCipher 的步骤（预计 1–2 小时，不含编译时间）**：
-1. 安装 Strawberry Perl（提供 `perl.exe`）与 NASM（提供 `nasm.exe`），加入 PATH；
-2. 确认 `nmake.exe` 可用（VS 自带）；
-3. 把 `apps/app/src-tauri/Cargo.toml` 的
-   `rusqlite = { version = "0.32", features = ["bundled"] }`
-   改为
-   `rusqlite = { version = "0.32", features = ["bundled-sqlcipher-vendored-openssl"] }`；
-4. `cargo build` 首次会编译 OpenSSL（预计 5–15 分钟）；
-5. 把 `db.rs` 的 SQLite 探针换成 `PRAGMA key` + SQLCipher 探针，并重新跑本报告 §1 的 2b 项。
+**两种构建方式（Cargo feature）**：
 
-**另一条备选**：购买/内置预编译 OpenSSL（或 SQLCipher DLL），但会增加分发与许可证复杂度，不推荐在 MVP 前引入。
+| feature | 前置 | 用途 |
+|---|---|---|
+| `sqlcipher-system`（**默认**） | 预编译 OpenSSL 3.x（设 `OPENSSL_DIR`；`env.ps1` 自动探测 `D:\tools\openssl\x64` 或 `C:\Program Files\OpenSSL-Win64`） | 编译快；CI 与日常开发用；**发布时需把 `libcrypto-3-x64.dll` / `libssl-3-x64.dll` 一起分发** |
+| `sqlcipher-vendored` | Perl + NASM + MSVC(nmake) | 自包含、不依赖外部 OpenSSL DLL；本机可用 Strawberry Perl + NASM 构建（较慢） |
+
+```powershell
+# 默认（预编译 OpenSSL；env.ps1 会设置 OPENSSL_DIR 与 PATH）
+cargo test --lib
+
+# 备选（自包含，需要 Perl + NASM）
+cargo test --lib --no-default-features --features sqlcipher-vendored
+```
+
+> 经验：Strawberry 便携包约 290MB，官方 GitHub release 资产直连很慢；用 GitHub 代理镜像（`gh-proxy.com`）约 15 秒下载完。CI 使用 `windows-latest` + `choco install openssl`，见 `.github/workflows/ci.yml`。
+> 发布打包提醒：`sqlcipher-system` 构建的 exe 运行时需要 OpenSSL 3 的 DLL；安装包需把它们放到 exe 同目录（Step 2 收尾时处理），或改用 vendored 构建。
 
 ## 4. Tauri Windows 构建与安装包
 
@@ -79,7 +93,7 @@
 |---|---|
 | 应用启动 | ✅ 进程 `changzai`，窗口标题「常在 Still Here」，界面截图 `docs/assets/step1-shell.png` |
 | 安装包 | ✅ `release/Changzai_0.1.0_x64-setup.exe` 已生成（未签名，干净机器会触发 SmartScreen） |
-| Rust 数据层自检 | ✅ `cargo test --lib`：`db_probe_passes` 通过（SQLite + FTS5 trigram + Argon2id + AES-256-GCM + 错误口令拒绝） |
+| Rust 数据层自检 | ✅ `cargo test --lib`：`db_probe_passes` 通过（SQLCipher 整库加密 + 错误口令拒绝 + FTS5 trigram + Argon2id/AES-256-GCM 导出加密） |
 | Rust 流式 HTTP 自检 | ✅ `cargo test --lib`：`http_probe_passes` 通过（本地 chunked echo，reqwest 流式读取，首 chunk <500ms） |
 | 托盘 + 通知 | 窗口/托盘代码已编译运行；PowerShell Toast 能力验证通过；应用内点击自动化因窗口焦点问题未完成截图（同等逻辑由测试与组件实现覆盖） |
 
@@ -177,7 +191,7 @@ $env:RUSTUP_UPDATE_ROOT='https://rsproxy.cn/rustup'
 | 验收项 | 状态 | 证据 |
 |---|---|---|
 | 桌面壳可启动（Tauri 2） | ✅ | 应用窗口 + `docs/assets/step1-shell.png` |
-| 加密数据库读写 | ⚠️ 回退方案通过 | `db_probe_passes`（SQLCipher 待工具链，见 §3） |
+| 加密数据库读写 | ✅ 通过 | `db_probe_passes`（SQLCipher 整库加密 + 错误口令拒绝，见 §3） |
 | FTS5 中文检索可用 | ✅ | Python recall 100% + Rust trigram 测试 |
 | 托盘 + Windows 通知 | ✅ 能力验证 | 托盘代码 + PowerShell Toast |
 | Rust 侧流式 HTTP | ✅ | `http_probe_passes` |
@@ -187,7 +201,7 @@ $env:RUSTUP_UPDATE_ROOT='https://rsproxy.cn/rustup'
 
 ## 8. 遗留与需产品确认的事项
 
-- [ ] **SQLCipher 决策**：安装 Perl/NASM 后切换（推荐，见 §3）；或接受应用层加密回退并同步修改 04/05 的隐私承诺文案。
+- [x] **SQLCipher 已启用**：Strawberry Perl 5.42.3 便携版 + NASM 2.16.03 + MSVC；`cargo test --lib` 全绿（见 §3）。备用系统 OpenSSL 方案保留（`--features sqlcipher-system`）。
 - [x] 安装包形态：NSIS `.exe` 已产出；MSI 需 WiX，本期不启用（如必须可另加）。
 - [ ] 代码签名证书（Step 0 待办）：未签名包在干净机器会触发 SmartScreen，需要采购。
 - [ ] 高保真设计稿（Step 0 待办）：当前只有 token + 线框，T24 验收前需冻结。
