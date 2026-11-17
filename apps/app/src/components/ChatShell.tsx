@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactElement } from "react";
-import { buildCustomRelationship, buildPresetRelationship, type CustomPersonaForm, type PersonaPreset } from "@changzai/core";
+import { buildCustomPersona, buildCustomRelationship, buildPresetPersona, buildPresetRelationship, type CustomPersonaForm, type PersonaPreset, type PersonaProfile, type RelationshipProfile } from "@changzai/core";
 import { useChat, lastMessageOf, messagePreview, type ChatMsg } from "../hooks/useChat.ts";
 import { useAnalytics } from "../hooks/useAnalytics.ts";
 import { useDatabase } from "../hooks/useDatabase.ts";
@@ -14,6 +14,7 @@ import { useOnboarding } from "../hooks/useOnboarding.ts";
 import { usePin } from "../hooks/usePin.ts";
 import { usePersona } from "../hooks/usePersona.ts";
 import { useProactive } from "../hooks/useProactive.ts";
+import { useConversations, type ConversationRecord } from "../hooks/useConversations.ts";
 import { useProfile } from "../hooks/useProfile.ts";
 import { useToast } from "../hooks/useToast.ts";
 import { readChatImageFile } from "../lib/avatar.ts";
@@ -21,7 +22,7 @@ import { displayName } from "../lib/profile.ts";
 import type { PersonProfile } from "../lib/profile.ts";
 import type { ImportedMediaFile } from "../lib/tauri.ts";
 import { api } from "../lib/tauri.ts";
-import { ConversationList } from "./ConversationList.tsx";
+import { ConversationList, type ConversationSearchResults } from "./ConversationList.tsx";
 import { ChatHeader } from "./ChatHeader.tsx";
 import { Composer, type ComposerAction } from "./Composer.tsx";
 import { ImageLightbox, type PreviewImage } from "./ImageLightbox.tsx";
@@ -39,6 +40,22 @@ import { SidePanel } from "./SidePanel.tsx";
 import { Toast } from "./Toast.tsx";
 
 /** 主界面：64px 导航 + 280px 会话列表 + 聊天区。 */
+function fallbackRelationship(userName: string): RelationshipProfile {
+  const now = Date.now();
+  return {
+    version: 1,
+    type: "朋友",
+    confidence: 0.3,
+    userName,
+    herNicknameForUser: "你",
+    userFacts: [],
+    notes: "默认关系；可在设置 → 关系与称呼中修改。",
+    summary: "你们目前是「朋友」关系（默认值，可修改）。",
+    updatedAt: now,
+    source: { messages: 0, herMessages: 0, spanDays: 0 },
+  };
+}
+
 export function ChatShell(): ReactElement {
   const db = useDatabase();
   const llm = useLlmConfig();
@@ -49,8 +66,12 @@ export function ChatShell(): ReactElement {
   const pin = usePin();
   const { profile, storageError, setName, setAvatar, reset } = useProfile(db.ready);
   const { toast, show } = useToast();
-  const herName = displayName(profile.her, "ta");
+  const conversations = useConversations(db.ready);
+  const activeConversation = conversations.active;
+  const herName = activeConversation?.herName ?? displayName(profile.her, "ta");
+  const herAvatar = activeConversation?.herAvatar ?? profile.her.avatar;
   const meName = displayName(profile.me, "我");
+  const her = useMemo<PersonProfile>(() => ({ name: herName, avatar: herAvatar }), [herAvatar, herName]);
   const relationship = useRelationship(herName, meName, db.ready);
   const styleFeedback = useStyleFeedback();
   const { messages, typing, unread, sendText, sendImage, appendImported, appendProactive, resetToGreeting, recallLastMessage, deleteMessage, clear, markRead } = useChat({
@@ -60,7 +81,8 @@ export function ChatShell(): ReactElement {
     meName,
     emotion: emotion.effective,
     onEmotion: emotion.update,
-    dbReady: db.ready,
+    dbReady: db.ready && conversations.ready,
+    conversationId: activeConversation?.id,
     relationship: relationship.profile,
     styleCalibration: styleFeedback.calibration,
     moodNote: emotion.moodNote,
@@ -85,6 +107,11 @@ export function ChatShell(): ReactElement {
   const [memoryOpen, setMemoryOpen] = useState(false);
   const [insertDraft, setInsertDraft] = useState<{ id: number; text: string } | null>(null);
   const night = new Date().getHours() >= 23 || new Date().getHours() < 7;
+  const suppressConversationSync = useRef(false);
+  const defaultConversationChecked = useRef(false);
+  const loadedConversationRef = useRef<string | null>(null);
+  const [convMenu, setConvMenu] = useState<{ record: ConversationRecord; x: number; y: number } | null>(null);
+  const [searchResults, setSearchResults] = useState<ConversationSearchResults>({ conversations: [], messages: [] });
 
   useEffect(() => {
     if (onboarding.ready && onboarding.done && db.ready && persona.ready && !persona.profile) {
@@ -92,38 +119,219 @@ export function ChatShell(): ReactElement {
     }
   }, [db.ready, onboarding.done, onboarding.ready, persona.profile, persona.ready]);
 
-  const handleCreatePreset = useCallback(
-    async (preset: PersonaPreset): Promise<void> => {
-      const next = await persona.applyPreset(preset.id);
-      if (!next) return;
-      await relationship.save(buildPresetRelationship(preset, meName));
-      clear();
-      appendProactive(preset.greeting);
-      markRead();
+  const createConversation = useCallback(
+    async (
+      profile: PersonaProfile,
+      relation: RelationshipProfile,
+      title: string,
+      greeting: string,
+    ): Promise<void> => {
+      const now = Date.now();
+      const id = `conv-${now.toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+      const record: ConversationRecord = {
+        id,
+        title,
+        herName: "ta",
+        herAvatar: null,
+        persona: profile,
+        relationship: relation,
+        greeting,
+        lastPreview: greeting,
+        lastMessageAt: now,
+        createdAt: now,
+        updatedAt: now,
+      };
+      conversations.upsert(record);
+      const message = { id: `greet-${id}`, from: "her" as const, kind: "text" as const, text: greeting, ts: now };
+      await api.chatAppend(message.id, message.ts, JSON.stringify({ ...message, convId: id })).catch(() => undefined);
+      conversations.setActive(id);
+      persona.replace(profile);
+      relationship.replace(relation);
       await onboarding.complete();
       setPersonaStartOpen(false);
-      show(`已用「${preset.label}」创建人格，可以开始聊天了`);
+      setRailTab("chat");
+      show(`已创建「${title}」，可以开始聊天了`);
     },
-    [meName, onboarding, persona, relationship, resetToGreeting, show],
+    [conversations, onboarding, persona, relationship, show],
+  );
+
+  const handleCreatePreset = useCallback(
+    async (preset: PersonaPreset): Promise<void> => {
+      const profile = buildPresetPersona(preset, Date.now());
+      const relation = buildPresetRelationship(preset, meName);
+      await createConversation(profile, relation, preset.label, preset.greeting);
+    },
+    [createConversation, meName],
   );
 
   const handleCreateCustom = useCallback(
     async (form: CustomPersonaForm): Promise<void> => {
-      const next = await persona.applyCustom(form);
-      if (!next) return;
-      await relationship.save(buildCustomRelationship(form, meName));
-      clear();
-      appendProactive("在的，今天想聊点什么？");
-      markRead();
-      await onboarding.complete();
-      setPersonaStartOpen(false);
-      show("自定义人格已创建，可以开始聊天了");
+      const profile = buildCustomPersona(form, Date.now());
+      const relation = buildCustomRelationship(form, meName);
+      await createConversation(profile, relation, "自定义人格", "在的，今天想聊点什么？");
     },
-    [meName, onboarding, persona, relationship, resetToGreeting, show],
+    [createConversation, meName],
   );
+
+  // 旧数据：只有 persona/chat_message，没有会话记录时，创建默认会话
+  useEffect(() => {
+    if (!db.ready || !conversations.ready || !persona.ready) return;
+    if (conversations.items.length === 0) {
+      if (!persona.profile) return;
+      const now = Date.now();
+      const record: ConversationRecord = {
+        id: "default",
+        title: displayName(profile.her, "ta"),
+        herName: displayName(profile.her, "ta"),
+        herAvatar: profile.her.avatar,
+        persona: persona.profile,
+        relationship: relationship.profile ?? fallbackRelationship(meName),
+        greeting: "",
+        createdAt: now,
+        updatedAt: now,
+      };
+      conversations.upsert(record);
+      conversations.setActive("default");
+      return;
+    }
+    if (!conversations.activeId) conversations.setActive(conversations.items[0]!.id);
+  }, [
+    conversations,
+    db.ready,
+    meName,
+    persona.profile,
+    persona.ready,
+    profile.her,
+    relationship.profile,
+  ]);
+
+  // 当前会话的人格/关系变化同步到会话记录
+  useEffect(() => {
+    if (!activeConversation || !persona.profile) return;
+    conversations.update(activeConversation.id, {
+      persona: persona.profile,
+      relationship: relationship.profile ?? activeConversation.relationship,
+    });
+  }, [activeConversation?.id, conversations.update, persona.profile, relationship.profile]);
+
+  useEffect(() => {
+    const term = search.trim();
+    if (!term) {
+      setSearchResults({ conversations: [], messages: [] });
+      return;
+    }
+    let alive = true;
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        const matchedConversations = conversations.items.filter(
+          (item) => item.title.includes(term) || item.herName.includes(term),
+        );
+        const matchedMessages: ConversationSearchResults["messages"] = [];
+        try {
+          const rows = await api.chatLoad(2000);
+          for (const row of rows) {
+            try {
+              const parsed = JSON.parse(row.payload) as ChatMsg & { convId?: string };
+              if (parsed.kind !== "text" || !parsed.text?.includes(term)) continue;
+              const conversation = conversations.items.find((item) => item.id === (parsed.convId ?? "default"));
+              matchedMessages.push({
+                convId: parsed.convId ?? "default",
+                title: conversation?.title ?? "未命名聊天",
+                text: parsed.text,
+                ts: parsed.ts,
+                sender: parsed.from,
+              });
+            } catch {
+              /* 跳过损坏消息 */
+            }
+          }
+        } catch {
+          /* 搜索失败时至少保留聊天名结果 */
+        }
+        if (!alive) return;
+        setSearchResults({
+          conversations: matchedConversations,
+          messages: matchedMessages.sort((a, b) => b.ts - a.ts).slice(0, 30),
+        });
+      })();
+    }, 180);
+    return () => {
+      alive = false;
+      window.clearTimeout(timer);
+    };
+  }, [conversations.items, search]);
+
+  const deleteConversationMessages = useCallback(async (id: string): Promise<void> => {
+    const rows = await api.chatLoad(2000).catch(() => []);
+    for (const row of rows) {
+      try {
+        const parsed = JSON.parse(row.payload) as ChatMsg & { convId?: string };
+        if ((parsed.convId ?? "default") === id) await api.chatDelete(row.id);
+      } catch {
+        /* 跳过损坏消息 */
+      }
+    }
+  }, []);
+
+  const handleClearConversation = useCallback(
+    async (record: ConversationRecord): Promise<void> => {
+      if (!window.confirm(`清空「${record.title}」的聊天记录？消息会从本机删除，但保留这个聊天和人格。`)) return;
+      await deleteConversationMessages(record.id);
+      conversations.update(record.id, { lastPreview: "还没有开始", lastMessageAt: 0 });
+      if (record.id === activeConversation?.id) clear();
+      show("聊天记录已清空");
+    },
+    [activeConversation?.id, clear, conversations, deleteConversationMessages, show],
+  );
+
+  const handleDeleteConversation = useCallback(
+    async (record: ConversationRecord): Promise<void> => {
+      if (!window.confirm(`删除「${record.title}」？这个聊天和人格会从列表移除。`)) return;
+      if (!window.confirm("删除后聊天记录不可恢复，再次确认永久删除？")) return;
+      await deleteConversationMessages(record.id);
+      const remaining = conversations.items.filter((item) => item.id !== record.id);
+      conversations.remove(record.id);
+      if (record.id === activeConversation?.id) {
+        clear();
+        const next = remaining[0];
+        if (next) {
+          persona.replace(next.persona);
+          relationship.replace(next.relationship);
+          conversations.setActive(next.id);
+        } else {
+          conversations.setActive(null);
+        }
+      }
+      show("聊天已删除");
+    },
+    [activeConversation?.id, clear, conversations, deleteConversationMessages, persona, relationship, show],
+  );
+
   const importer = useImport(async (result) => {
     await db.refresh();
     await persona.buildFromImport(result.messages);
+    const importedProfile = (await api.personaLoad()) as PersonaProfile | null;
+    if (importedProfile) {
+      const now = Date.now();
+      const relation = relationship.profile ?? fallbackRelationship(meName);
+      const record: ConversationRecord = {
+        id: `conv-${now.toString(36)}`,
+        title: displayName(profile.her, "ta"),
+        herName: displayName(profile.her, "ta"),
+        herAvatar: profile.her.avatar,
+        persona: importedProfile,
+        relationship: relation,
+        greeting: "",
+        lastPreview: "还没有开始",
+        createdAt: now,
+        updatedAt: now,
+      };
+      conversations.upsert(record);
+      conversations.setActive(record.id);
+      relationship.replace(relation);
+      setPersonaStartOpen(false);
+      await onboarding.complete();
+    }
     if (!relationship.profile) void relationship.rebuild();
     void api.memoryRebuild().catch(() => undefined);
     analytics.log("import_done");
@@ -247,10 +455,6 @@ export function ChatShell(): ReactElement {
   );
   const media = useMediaImport(handleImported);
 
-  const her = useMemo<PersonProfile>(
-    () => ({ name: displayName(profile.her, "ta"), avatar: profile.her.avatar }),
-    [profile.her],
-  );
   const me = useMemo<PersonProfile>(
     () => ({ name: displayName(profile.me, "我"), avatar: profile.me.avatar }),
     [profile.me],
@@ -260,12 +464,71 @@ export function ChatShell(): ReactElement {
   const previewText = typing ? "对方正在输入…" : messagePreview(last);
   const lastTs = last?.ts ?? Date.now();
 
+  const settingsProfile = useMemo(
+    () =>
+      activeConversation
+        ? {
+            ...profile,
+            her: { ...profile.her, name: activeConversation.herName, avatar: activeConversation.herAvatar },
+          }
+        : profile,
+    [activeConversation, profile],
+  );
+
+  const handleNameChange = useCallback(
+    (who: "her" | "me", name: string) => {
+      setName(who, name);
+      if (who === "her" && activeConversation) {
+        conversations.update(activeConversation.id, {
+          herName: name,
+          title:
+            activeConversation.title === activeConversation.herName ? name : activeConversation.title,
+        });
+      }
+    },
+    [activeConversation, conversations, setName],
+  );
+
+  const handleAvatarChange = useCallback(
+    (who: "her" | "me", avatar: string | null) => {
+      setAvatar(who, avatar);
+      if (who === "her" && activeConversation) {
+        conversations.update(activeConversation.id, { herAvatar: avatar });
+      }
+    },
+    [activeConversation, conversations, setAvatar],
+  );
+
   const closeSettings = useCallback(() => setSettingsOpen(false), []);
 
-  const handleSelectConversation = useCallback(() => {
-    setRailTab("chat");
-    markRead();
-  }, [markRead]);
+  const handleSelectConversation = useCallback(
+    (id?: string) => {
+      setRailTab("chat");
+      if (!id) {
+        setSearch("");
+        return;
+      }
+      if (id === activeConversation?.id) {
+        setSearch("");
+        markRead();
+        return;
+      }
+      if (activeConversation && persona.profile) {
+        conversations.update(activeConversation.id, {
+          persona: persona.profile,
+          relationship: relationship.profile ?? activeConversation.relationship,
+        });
+      }
+      const target = conversations.items.find((item) => item.id === id);
+      if (!target) return;
+      conversations.setActive(id);
+      persona.replace(target.persona);
+      relationship.replace(target.relationship);
+      setSearch("");
+      setRailTab("chat");
+    },
+    [activeConversation, conversations, markRead, persona, relationship],
+  );
 
   const handleRailSelect = useCallback((tab: RailTab) => {
     setRailTab(tab);
@@ -338,15 +601,17 @@ export function ChatShell(): ReactElement {
 
       {railTab === "chat" ? (
         <ConversationList
-          herName={her.name}
-          herAvatar={her.avatar}
-          preview={previewText}
-          ts={lastTs}
-          unread={unread}
+          items={conversations.items}
+          activeId={conversations.activeId}
           search={search}
+          searchResults={searchResults}
           onSearch={setSearch}
           onSelect={handleSelectConversation}
-          onAdd={() => show("这里只有 ta 一个人")}
+          onAdd={() => setPersonaStartOpen(true)}
+          onContextMenu={(record, event) => {
+            event.preventDefault();
+            setConvMenu({ record, x: event.clientX, y: event.clientY });
+          }}
         />
       ) : (
         <SidePanel tab={railTab} her={her} onOpenChat={handleSelectConversation} />
@@ -391,10 +656,10 @@ export function ChatShell(): ReactElement {
       {settingsOpen && (
         <SettingsDrawer
           onClose={closeSettings}
-          profile={profile}
+          profile={settingsProfile}
           storageError={storageError}
-          onNameChange={setName}
-          onAvatarChange={setAvatar}
+          onNameChange={handleNameChange}
+          onAvatarChange={handleAvatarChange}
           onReset={reset}
           media={media.state}
           canImport={media.canImport}
@@ -609,6 +874,37 @@ export function ChatShell(): ReactElement {
               }}
             >
               删除
+            </button>
+          </div>
+        </div>
+      )}
+
+      {convMenu !== null && (
+        <div className="message-menu-backdrop" onClick={() => setConvMenu(null)}>
+          <div
+            className="message-menu"
+            style={{ left: convMenu.x, top: convMenu.y }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => {
+                const record = convMenu.record;
+                setConvMenu(null);
+                void handleClearConversation(record);
+              }}
+            >
+              清空聊天记录
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const record = convMenu.record;
+                setConvMenu(null);
+                void handleDeleteConversation(record);
+              }}
+            >
+              删除聊天（不可恢复）
             </button>
           </div>
         </div>

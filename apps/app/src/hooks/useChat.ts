@@ -107,6 +107,8 @@ export interface ChatOptions {
   emotion: EmotionState;
   onEmotion: (state: EmotionState) => void;
   dbReady?: boolean;
+  /** 当前会话 id；消息 payload 里也会带 convId */
+  conversationId?: string;
   relationship?: RelationshipProfile | null;
   styleCalibration?: string;
   moodNote?: string;
@@ -141,13 +143,16 @@ function llmUsable(llm: LlmConfig | null): boolean {
  * - 只有人格卡没有模型：提示去设置里配置，不伪造回复。
  */
 export function useChat(options: ChatOptions): ChatApi {
-  const [messages, setMessages] = useState<ChatMsg[]>(seedMessages);
+  const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [typing, setTyping] = useState(false);
   const [unread, setUnread] = useState(2);
   const counter = useRef(0);
   const replyTimer = useRef<number | null>(null);
   const recallTimestamps = useRef<number[]>([]);
   const loadedRef = useRef(false);
+  const loadedConversationRef = useRef<string | null>(null);
+  const conversationId = options.conversationId ?? "default";
+  const conversationStateKey = `conversation.state.${conversationId}`;
   const conversationRef = useRef<{ summary: string; topic: string; turns: number }>({
     summary: "",
     topic: "",
@@ -175,8 +180,8 @@ export function useChat(options: ChatOptions): ChatApi {
 
   const persistMessage = useCallback((message: ChatMsg): void => {
     if (!isTauri()) return;
-    void api.chatAppend(message.id, message.ts, JSON.stringify(message)).catch(() => undefined);
-  }, []);
+    void api.chatAppend(message.id, message.ts, JSON.stringify({ ...message, convId: conversationId })).catch(() => undefined);
+  }, [conversationId]);
 
   const deletePersisted = useCallback((id: string): void => {
     if (!isTauri()) return;
@@ -184,15 +189,16 @@ export function useChat(options: ChatOptions): ChatApi {
   }, []);
 
   useEffect(() => {
-    if (!isTauri()) return;
+    if (!isTauri() || !options.conversationId || options.dbReady === false) return;
     let alive = true;
     void (async () => {
       try {
         const [rows, conversationRaw] = await Promise.all([
-          api.chatLoad(300),
-          api.settingGet("conversation.state"),
+          api.chatLoad(2000),
+          api.settingGet(conversationStateKey),
         ]);
         if (!alive) return;
+        setMessages([]);
         if (conversationRaw) {
           try {
             const parsed = JSON.parse(conversationRaw) as { summary?: string; topic?: string; turns?: number };
@@ -205,30 +211,34 @@ export function useChat(options: ChatOptions): ChatApi {
             /* 忽略损坏摘要 */
           }
         }
-        if (rows.length === 0) return;
         const loaded: ChatMsg[] = [];
         for (const row of rows) {
           try {
-            const parsed = JSON.parse(row.payload) as ChatMsg;
-            if (parsed && typeof parsed.id === "string" && typeof parsed.ts === "number") loaded.push(parsed);
+            const parsed = JSON.parse(row.payload) as ChatMsg & { convId?: string };
+            if (
+              parsed &&
+              typeof parsed.id === "string" &&
+              typeof parsed.ts === "number" &&
+              (parsed.convId ?? "default") === conversationId
+            ) {
+              loaded.push(parsed);
+            }
           } catch {
             /* 跳过损坏的一行 */
           }
         }
-        if (loaded.length > 0) {
-          setMessages(loaded);
-          setUnread(0);
-          counter.current = loaded.length;
-          loadedRef.current = true;
-        }
+        setMessages(loaded);
+        setUnread(0);
+        counter.current = loaded.length;
+        loadedRef.current = true;
       } catch {
-        /* 旧库没有 chat_message 时保留演示消息 */
+        /* 旧库没有 chat_message 时保留空会话 */
       }
     })();
     return () => {
       alive = false;
     };
-  }, []);
+  }, [conversationId, options.conversationId, options.dbReady]);
 
   // 用最近 8 条生成短摘要：控制上下文长度，同时让重启后的 ta 知道之前在聊什么
   useEffect(() => {
@@ -246,9 +256,9 @@ export function useChat(options: ChatOptions): ChatApi {
     };
     conversationRef.current = next;
     if (isTauri()) {
-      void api.settingSet("conversation.state", JSON.stringify(next)).catch(() => undefined);
+      void api.settingSet(conversationStateKey, JSON.stringify(next)).catch(() => undefined);
     }
-  }, [messages.length]);
+  }, [conversationStateKey, messages.length]);
 
   const scheduleReply = useCallback((): void => {
     clearReplyTimer();
@@ -541,7 +551,7 @@ export function useChat(options: ChatOptions): ChatApi {
       conversationRef.current = { summary: "", topic: "", turns: 0 };
       if (isTauri()) {
         await api
-          .settingSet("conversation.state", JSON.stringify({ summary: "", topic: "", turns: 0 }))
+          .settingSet(conversationStateKey, JSON.stringify({ summary: "", topic: "", turns: 0 }))
           .catch(() => undefined);
       }
       setMessages([message]);
@@ -558,7 +568,7 @@ export function useChat(options: ChatOptions): ChatApi {
     conversationRef.current = { summary: "", topic: "", turns: 0 };
     if (isTauri()) {
       void api.chatClear().catch(() => undefined);
-      void api.settingSet("conversation.state", JSON.stringify({ summary: "", topic: "", turns: 0 })).catch(() => undefined);
+      void api.settingSet(conversationStateKey, JSON.stringify({ summary: "", topic: "", turns: 0 })).catch(() => undefined);
     }
   }, [clearReplyTimer]);
 
