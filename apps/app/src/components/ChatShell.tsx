@@ -1,9 +1,11 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactElement } from "react";
 import { useChat, lastMessageOf, messagePreview } from "../hooks/useChat.ts";
 import { useDatabase } from "../hooks/useDatabase.ts";
 import { useImport } from "../hooks/useImport.ts";
+import { useLlmConfig } from "../hooks/useLlmConfig.ts";
 import { useMediaImport } from "../hooks/useMediaImport.ts";
+import { usePersona } from "../hooks/usePersona.ts";
 import { useProfile } from "../hooks/useProfile.ts";
 import { useToast } from "../hooks/useToast.ts";
 import { readChatImageFile } from "../lib/avatar.ts";
@@ -24,16 +26,36 @@ import { Toast } from "./Toast.tsx";
 /** 主界面：64px 导航 + 280px 会话列表 + 聊天区。 */
 export function ChatShell(): ReactElement {
   const db = useDatabase();
+  const llm = useLlmConfig();
+  const persona = usePersona();
   const { profile, storageError, setName, setAvatar, reset } = useProfile(db.ready);
-  const { messages, typing, unread, sendText, sendImage, appendImported, markRead } = useChat();
   const { toast, show } = useToast();
+  const { messages, typing, unread, sendText, sendImage, appendImported, clear, markRead } = useChat({
+    persona: persona.profile,
+    llm: llm.config,
+    herName: displayName(profile.her, "ta"),
+    meName: displayName(profile.me, "我"),
+    onNotice: show,
+  });
 
   const [railTab, setRailTab] = useState<RailTab>("chat");
   const [search, setSearch] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [preview, setPreview] = useState<PreviewImage | null>(null);
   const [importOpen, setImportOpen] = useState(false);
-  const importer = useImport(db.refresh);
+  const importer = useImport(async (result) => {
+    await db.refresh();
+    await persona.buildFromImport(result.messages);
+    show("人格卡已生成，可以在设置里查看");
+  });
+
+  const clearedDemo = useRef(false);
+  useEffect(() => {
+    if (!clearedDemo.current && persona.profile !== null && persona.profile.source.her_messages > 0) {
+      clearedDemo.current = true;
+      clear();
+    }
+  }, [clear, persona.profile]);
 
   const openImport = useCallback(() => {
     importer.reset();
@@ -55,7 +77,7 @@ export function ChatShell(): ReactElement {
   const media = useMediaImport(handleImported);
 
   const her = useMemo<PersonProfile>(
-    () => ({ name: displayName(profile.her, "她"), avatar: profile.her.avatar }),
+    () => ({ name: displayName(profile.her, "ta"), avatar: profile.her.avatar }),
     [profile.her],
   );
   const me = useMemo<PersonProfile>(
@@ -123,7 +145,7 @@ export function ChatShell(): ReactElement {
           search={search}
           onSearch={setSearch}
           onSelect={handleSelectConversation}
-          onAdd={() => show("这里只有她一个人")}
+          onAdd={() => show("这里只有 ta 一个人")}
         />
       ) : (
         <SidePanel tab={railTab} her={her} onOpenChat={handleSelectConversation} />
@@ -131,6 +153,9 @@ export function ChatShell(): ReactElement {
 
       <main className="chat-main">
         <ChatHeader her={her} typing={typing} onOpenSettings={() => setSettingsOpen(true)} />
+        {messages.length === 0 && persona.profile !== null && (
+          <div className="chat-ready-hint">已生成 ta 的人格卡，发一句试试。</div>
+        )}
         <MessageList messages={messages} her={her} me={me} typing={typing} onPreview={setPreview} />
         <Composer onSend={handleSend} onPickImage={handlePickImage} onUnavailable={handleUnavailable} />
       </main>
@@ -150,6 +175,17 @@ export function ChatShell(): ReactElement {
           dbReady={db.ready}
           dbError={db.error}
           onOpenImport={openImport}
+          llmConfig={llm.config}
+          llmStatus={llm.message}
+          onSaveLlm={(config) => {
+            void llm.save(config);
+          }}
+          persona={persona.profile}
+          personaBusy={persona.busy}
+          personaMessage={persona.message}
+          onRebuildPersona={() => {
+            void persona.rebuildFromDb();
+          }}
         />
       )}
 

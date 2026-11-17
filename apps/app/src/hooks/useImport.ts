@@ -43,7 +43,7 @@ function toRows(result: ImportResult): ImportMessageRow[] {
   }));
 }
 
-export function useImport(onSaved: () => Promise<void>): ImportApi {
+export function useImport(onSaved: (result: ImportResult) => Promise<void>): ImportApi {
   const [state, setState] = useState<ImportState>(INITIAL);
   const canImport = isTauri();
 
@@ -102,7 +102,7 @@ export function useImport(onSaved: () => Promise<void>): ImportApi {
             return;
           }
           setState({ step: "done", message: "", result, saved: true });
-          await onSaved();
+          await onSaved(result);
         } catch (error) {
           setState({
             step: "error",

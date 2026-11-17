@@ -12,7 +12,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use encoding_rs::GB18030;
 use rand::RngCore;
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use tauri::Manager;
 use tauri_plugin_dialog::DialogExt;
@@ -29,7 +29,7 @@ fn now_ms() -> i64 {
         .unwrap_or(0)
 }
 
-fn app_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+pub(crate) fn app_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     app.path()
         .app_data_dir()
         .map_err(|e| format!("app data dir: {e}"))
@@ -51,7 +51,7 @@ fn load_or_create_key(dir: &Path) -> Result<String, String> {
     Ok(key)
 }
 
-fn open_at(dir: &Path) -> Result<Connection, String> {
+pub(crate) fn open_at(dir: &Path) -> Result<Connection, String> {
     let key = load_or_create_key(dir)?;
     let path = dir.join(DB_FILE);
     let conn = Connection::open(&path).map_err(|e| format!("open db: {e}"))?;
@@ -88,7 +88,7 @@ pub struct DbStats {
     pub last_import_at: Option<i64>,
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ImportMessage {
     pub id: String,
@@ -375,6 +375,67 @@ fn profile_load_at(dir: &Path) -> Result<Option<ProfilePayload>, String> {
     }
 }
 
+pub(crate) fn read_setting_at(dir: &Path, key: &str) -> Result<Option<String>, String> {
+    let conn = open_at(dir)?;
+    if !table_exists(&conn, "setting")? {
+        return Ok(None);
+    }
+    conn.query_row("SELECT v FROM setting WHERE k = ?1", params![key], |row| row.get(0))
+        .optional()
+        .map_err(|e| e.to_string())
+}
+
+pub(crate) fn write_setting_at(dir: &Path, key: &str, value: &str) -> Result<(), String> {
+    let conn = open_at(dir)?;
+    if !table_exists(&conn, "setting")? {
+        return Err("数据库尚未初始化".to_string());
+    }
+    conn.execute(
+        "INSERT OR REPLACE INTO setting(k, v) VALUES (?1, ?2)",
+        params![key, value],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+fn messages_load_at(dir: &Path, limit: usize) -> Result<Vec<ImportMessage>, String> {
+    let conn = open_at(dir)?;
+    if !table_exists(&conn, "message")? {
+        return Ok(Vec::new());
+    }
+    let limit = limit.clamp(1, 200_000) as i64;
+    let mut statement = conn
+        .prepare(
+            "SELECT id, conv_id, ts, sender, type, content, media_path, reply_to,
+                    latency_s, burst_index, burst_size, is_holdout
+             FROM message ORDER BY ts ASC LIMIT ?1",
+        )
+        .map_err(|e| e.to_string())?;
+    let rows = statement
+        .query_map(params![limit], |row| {
+            Ok(ImportMessage {
+                id: row.get(0)?,
+                conv_id: row.get(1)?,
+                ts: row.get(2)?,
+                sender: row.get(3)?,
+                msg_type: row.get(4)?,
+                content: row.get(5)?,
+                media_path: row.get(6)?,
+                reply_to: row.get(7)?,
+                latency_s: row.get(8)?,
+                burst_index: row.get(9)?,
+                burst_size: row.get(10)?,
+                is_holdout: row.get(11)?,
+            })
+        })
+        .map_err(|e| e.to_string())?;
+    let mut out = Vec::new();
+    for row in rows {
+        out.push(row.map_err(|e| e.to_string())?);
+    }
+    Ok(out)
+}
+
 fn persist_media_at(dir: &Path, files: &[MediaPersistItem]) -> Result<i64, String> {
     if files.is_empty() {
         return Ok(0);
@@ -485,6 +546,42 @@ pub fn media_persist(app: tauri::AppHandle, files: Vec<MediaPersistItem>) -> Res
         inserted,
         message: format!("已记录 {inserted} 个素材"),
     })
+}
+
+#[tauri::command]
+pub fn setting_get(app: tauri::AppHandle, key: String) -> Result<Option<String>, String> {
+    let dir = app_dir(&app)?;
+    read_setting_at(&dir, &key)
+}
+
+#[tauri::command]
+pub fn setting_set(app: tauri::AppHandle, key: String, value: String) -> Result<bool, String> {
+    let dir = app_dir(&app)?;
+    write_setting_at(&dir, &key, &value)?;
+    Ok(true)
+}
+
+#[tauri::command]
+pub fn persona_save(app: tauri::AppHandle, persona: serde_json::Value) -> Result<bool, String> {
+    let dir = app_dir(&app)?;
+    let json = serde_json::to_string(&persona).map_err(|e| e.to_string())?;
+    write_setting_at(&dir, "persona.profile", &json)?;
+    Ok(true)
+}
+
+#[tauri::command]
+pub fn persona_load(app: tauri::AppHandle) -> Result<Option<serde_json::Value>, String> {
+    let dir = app_dir(&app)?;
+    let Some(raw) = read_setting_at(&dir, "persona.profile")? else {
+        return Ok(None);
+    };
+    serde_json::from_str(&raw).map(Some).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn messages_load(app: tauri::AppHandle, limit: Option<usize>) -> Result<Vec<ImportMessage>, String> {
+    let dir = app_dir(&app)?;
+    messages_load_at(&dir, limit.unwrap_or(50_000))
 }
 
 #[tauri::command]
@@ -651,7 +748,7 @@ mod tests {
 
         let profile = ProfilePayload {
             her: ProfileSide {
-                name: "小林".to_string(),
+                name: "ta".to_string(),
                 avatar: Some("data:image/png;base64,AAAA".to_string()),
             },
             me: ProfileSide {
@@ -661,7 +758,7 @@ mod tests {
         };
         profile_save_at(&dir, &profile).expect("save profile");
         let loaded = profile_load_at(&dir).expect("load profile").expect("profile exists");
-        assert_eq!(loaded.her.name, "小林");
+        assert_eq!(loaded.her.name, "ta");
         assert_eq!(loaded.me.name, "我");
 
         let media = persist_media_at(
@@ -675,6 +772,21 @@ mod tests {
         )
         .expect("media");
         assert_eq!(media, 1);
+
+        // Step 3：setting / persona / messages_load
+        write_setting_at(&dir, "llm.config", "{\"model\":\"test\"}").expect("setting write");
+        assert_eq!(
+            read_setting_at(&dir, "llm.config").expect("setting read"),
+            Some("{\"model\":\"test\"}".to_string())
+        );
+        write_setting_at(&dir, "persona.profile", "{\"version\":1}").expect("persona write");
+        assert_eq!(
+            read_setting_at(&dir, "persona.profile").expect("persona read"),
+            Some("{\"version\":1}".to_string())
+        );
+        let loaded_messages = messages_load_at(&dir, 100).expect("messages load");
+        assert_eq!(loaded_messages.len(), 10);
+        assert_eq!(loaded_messages[0].id, "m_0");
 
         let _ = fs::remove_dir_all(&dir);
     }

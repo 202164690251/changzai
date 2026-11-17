@@ -1,7 +1,7 @@
 // 与 Rust 宿主命令的契约。
 // 浏览器里（纯 vite dev）命令不可用：界面会提示改用桌面应用启动。
 
-import { invoke } from "@tauri-apps/api/core";
+import { Channel, invoke } from "@tauri-apps/api/core";
 
 export interface AppInfo {
   version: string;
@@ -147,6 +147,27 @@ export interface MediaPersistResult {
   message: string;
 }
 
+/* ───────────────── Step 3：模型 / 人格 / 流式对话 ───────────────── */
+
+export interface LlmConfig {
+  baseUrl: string;
+  model: string;
+  apiKey: string;
+  temperature: number;
+}
+
+export type ChatRole = "system" | "user" | "assistant";
+
+export interface ChatMessagePayload {
+  role: ChatRole;
+  content: string;
+}
+
+export interface LlmChatEvent {
+  kind: "delta" | "done" | "error";
+  text: string;
+}
+
 export function isTauri(): boolean {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }
@@ -199,7 +220,7 @@ export const api = {
     requireTauri();
     return invoke<NotifyProbeResult>("notify_probe", {
       title: "常在 · 技术自检",
-      body: "如果你看到这条通知，说明 Windows 通知链路可用。这条不是她发的。",
+      body: "如果你看到这条通知，说明 Windows 通知链路可用。这条不是 ta 发的。",
     });
   },
   /** 回忆素材导入：由 Rust 弹出系统文件选择框，读回 dataUrl。 */
@@ -249,5 +270,37 @@ export const api = {
   async mediaPersist(files: MediaPersistItem[]): Promise<MediaPersistResult> {
     requireTauri();
     return invoke<MediaPersistResult>("media_persist", { files });
+  },
+  /** Step 3：模型配置（存在 SQLCipher setting 表） */
+  async llmConfigLoad(): Promise<LlmConfig> {
+    requireTauri();
+    return invoke<LlmConfig>("llm_config_load");
+  },
+  async llmConfigSave(config: LlmConfig): Promise<boolean> {
+    requireTauri();
+    return invoke<boolean>("llm_config_save", { config });
+  },
+  /** Step 3：人格卡持久化 */
+  async personaSave(persona: unknown): Promise<boolean> {
+    requireTauri();
+    return invoke<boolean>("persona_save", { persona });
+  },
+  async personaLoad(): Promise<unknown | null> {
+    requireTauri();
+    return invoke<unknown | null>("persona_load");
+  },
+  async messagesLoad(limit?: number): Promise<ImportMessageRow[]> {
+    requireTauri();
+    return invoke<ImportMessageRow[]>("messages_load", { limit: limit ?? null });
+  },
+  /** Step 3：流式对话；onEvent 先于 Promise resolve 收到 delta */
+  async llmChatStream(
+    messages: ChatMessagePayload[],
+    onEvent: (event: LlmChatEvent) => void,
+  ): Promise<void> {
+    requireTauri();
+    const channel = new Channel<LlmChatEvent>();
+    channel.onmessage = onEvent;
+    await invoke("llm_chat_stream", { messages, onEvent: channel });
   },
 };

@@ -246,7 +246,7 @@ pub fn db_probe(dir: Option<String>) -> DbProbeResult {
 
     // 5) 导出包加密：Argon2id 派生 + AES-256-GCM 封装
     let t = Instant::now();
-    let plaintext = "wx_20230520_0001 | 小林 | 明天降温，记得穿外套".as_bytes();
+    let plaintext = "wx_20230520_0001 | ta | 明天降温，记得穿外套".as_bytes();
     let seal_ok = (|| -> Result<(bool, bool, bool, bool), String> {
         let blob = seal(PROBE_PASSPHRASE, plaintext)?;
         let path = base.join("seal.bin");
