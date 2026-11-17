@@ -150,6 +150,28 @@ powershell -ExecutionPolicy Bypass -File scripts\dev.ps1
 powershell -ExecutionPolicy Bypass -File scripts\build.ps1
 ```
 
+**换机时的镜像配置（本机已配置，记录在此以便复现）**：
+
+```powershell
+# Cargo 镜像（%USERPROFILE%\.cargo\config.toml）
+@"
+[source.crates-io]
+replace-with = "rsproxy-sparse"
+[source.rsproxy-sparse]
+registry = "sparse+https://rsproxy.cn/index/"
+[net]
+git-fetch-with-cli = true
+"@ | Out-File -Encoding utf8 "$env:USERPROFILE\.cargo\config.toml"
+
+# Rustup 镜像（安装工具链时设置）
+$env:RUSTUP_DIST_SERVER='https://rsproxy.cn'
+$env:RUSTUP_UPDATE_ROOT='https://rsproxy.cn/rustup'
+```
+
+> npm 镜像写在仓库 `.npmrc`（npmmirror）；Tauri 打包工具镜像写在 `scripts/build.ps1`（`TAURI_BUNDLER_TOOLS_GITHUB_MIRROR=https://ghproxy.net/https://github.com`），可用环境变量覆盖。
+
+**最近一次全量验收**：2026-11-17 11:12，`scripts/verify.ps1` 全绿（类型检查、11 项 core 单测、2 项 Rust 探针、6 项 spike），退出码 0。
+
 ## 7. Step 1 验收对照（按 05 方案 Step 1）
 
 | 验收项 | 状态 | 证据 |

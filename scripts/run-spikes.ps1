@@ -29,8 +29,10 @@ $summary = [ordered]@{
     spikes    = [ordered]@{}
 }
 
+$script:failed = 0
 function Add-SpikeResult($name, $file, $ok, $note) {
     $summary.spikes[$name] = [ordered]@{ ok = $ok; resultFile = $file; note = $note }
+    if (-not $ok) { $script:failed++ }
     $status = if ($ok) { 'PASS' } else { 'FAIL' }
     Write-Host ("[{0}] {1}  {2}" -f $status, $name, $note)
 }
@@ -83,9 +85,20 @@ try {
 }
 
 # 5) 核心逻辑单测（Node 24 原生跑 TS）
+# 注意：Node 24 的 --test 不接受目录；PowerShell 5.1 对 native 命令的 @array 展开不可靠，
+# 因此在循环里逐个文件执行（当前只有 1 个测试文件，成本可忽略）。
 try {
-    $testOut = & node --test (Join-Path $repoRoot 'packages\core\test') 2>&1
-    $testOk = ($LASTEXITCODE -eq 0)
+    $testFiles = Get-ChildItem (Join-Path $repoRoot 'packages\core\test') -Filter '*.test.ts'
+    $testOut = @()
+    $failedFiles = 0
+    foreach ($file in $testFiles) {
+        $rel = 'packages/core/test/' + $file.Name
+        $out = & node --test $rel 2>&1
+        $testOut += $out
+        if ($LASTEXITCODE -ne 0) { $failedFiles++ }
+    }
+    $testOk = ($testFiles.Count -gt 0 -and $failedFiles -eq 0)
+    if (-not $testOk) { $testOut | Select-Object -Last 20 | Write-Host }
     Add-SpikeResult 'core-tests' '' $testOk ("node --test: {0}" -f ($(if ($testOk) { 'all pass' } else { 'FAILED' })))
 } catch {
     Add-SpikeResult 'core-tests' '' $false $_.Exception.Message
@@ -96,3 +109,9 @@ $summary | ConvertTo-Json -Depth 6 | Out-File -LiteralPath (Join-Path $results '
 Write-Host ''
 Write-Host ("结果目录: {0}" -f $results)
 Write-Host ("报告: docs\step1-spike-report.md（由本次结果整理）")
+if ($script:failed -gt 0) {
+    Write-Host ("[FAIL] {0} 项 spike 未通过" -f $script:failed)
+    exit 1
+}
+Write-Host '[PASS] 全部 spike 通过'
+exit 0
