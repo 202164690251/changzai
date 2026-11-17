@@ -94,67 +94,55 @@ git push -u origin feat/ui-wechat-shell
 - 构建：`powershell -ExecutionPolicy Bypass -File scripts\build.ps1`
 - 产物：`release/Changzai_<version>_x64-setup.exe`（未签名前仅内测分发；签名证书到位后替换）。
 
-## 8. 合并审核与 main 保护（重要）
+## 8. main 保护与合并审核（已开启）
 
-### 8.1 当前限制（已实测）
+> 2026-11-17：仓库已改为 **Public**，并按方案 B 开启了 `main` 分支保护。下面是 GitHub 上的实际规则。
 
-仓库目前是 **private + GitHub Free**。这种组合下 GitHub 不提供强制分支保护：调用分支保护或 Rulesets API 都会返回
-`403 Upgrade to GitHub Pro or make this repository public to enable this feature`。
-所以现在没有任何“平台强制必须审核才能进 main”的开关。
+### 8.1 当前强制规则（平台生效，不是口头约定）
 
-### 8.2 三种实现方式
+| 规则 | 值 |
+|---|---|
+| 直接 push `main` | ❌ 拒绝（实测返回 `GH006: Protected branch update failed ... Changes must be made through a pull request`） |
+| 必须走 Pull Request | ✅ 是 |
+| 最低批准数 | **1 人**，且必须包含 **Code Owners**（`.github/CODEOWNERS` = @202164690251）的审核 |
+| 新提交使旧批准失效 | ✅ 是（Dismiss stale reviews） |
+| 必须通过的 CI | **`web` + `rust`**，且分支必须与 main 同步（Strict） |
+| 必须解决所有 review 评论 | ✅ 是 |
+| Force push / 删除 main | ❌ 禁止 |
+| 合并方式 | **仅 Squash merge**；合并后自动删除分支 |
+| 管理员绕过 | 开启（owner 可应急直接操作；如需连 owner 也强制走 PR，见 §8.4） |
 
-#### 方案 A（推荐、零成本）：协作者只给 Read 权限 + Fork/PR
+> 仓库已启用 public 仓库的免费分支保护 / Rulesets；如之后改回私有，需要 GitHub Pro 才能继续使用强制保护。
 
-这是免费私有仓库下最接近“我审核后他们才能进 main”的做法：
+### 8.2 协作者现在怎么提交（推荐流程）
 
-1. 仓库 Settings → Collaborators → Add people，把对方权限设为 **Read**（不要 Write）；
-2. 对方在 GitHub 网页点 **Fork**（私有仓库的 fork 也是 private，本仓库已开启 allow_forking）；
-3. 对方 clone **自己的 fork**，在自己的分支上开发并 push 到 fork；
-4. 对方从 fork 向本仓库 `main` 发 **Pull Request**；
-5. CI 跑完、你 review 并点 **Squash merge** 后，代码才进入 main。
+1. **邀请**：仓库 Settings → Collaborators → Add people，权限给 **Write**（有保护后是安全的：他们能推分支、开 PR，但推不了 main、也合不了 PR）；
+2. **拉分支**：`git switch -c feat/<scope>-<short>`，开发、提交（Conventional Commits）；
+3. **推分支**：`git push -u origin feat/...`（推自己的分支没问题）；
+4. **开 PR**：按 PR 模板填「做了什么 / 如何验证 / 截图 / 关联 Issue」；
+5. **CI**：必须 `web` 与 `rust` 都绿（首次来自 fork 的外部 PR，需要你点一次 “Approve and run workflows”）；
+6. **审核**：你点 **Approve**（Code Owners 规则要求你审核）；有修改就让对方继续推（旧批准会失效）；
+7. **合并**：你点 **Squash and merge** → 自动删除分支 → 提交进入 main。
 
-效果：**对方没有 main 的写权限，不能直接 push，也不能合并 PR；只有你审核并合并后提交才进入 main。**
-代价：对方不能在主仓库建共享分支（都在自己 fork 里）；适合外部/外包/实习贡献者。
-注意：来自 fork 的首次 PR，CI 需要你点一次 “Approve and run workflows”。
+> 效果：**只有你审核通过并点合并之后，别人的提交才会进入 main；他们无法绕过 PR 直接写 main。**
 
-#### 方案 B（最标准、需要 Public 或 GitHub Pro）：开启强制分支保护 / Rulesets
+### 8.3 外部贡献者（无需邀请）
 
-前置二选一：
-- 仓库 Settings → General → Danger Zone → **Change visibility → Public**（免费即可用）；或
-- 升级 **GitHub Pro**（私有仓库也可用）。
+仓库 Public 后，任何人都可以：**Fork → 在自己的仓库开分支 → 向本仓库 main 发 PR**；同样必须过 CI + 你的 review 才能合并。
 
-然后（二选一）：
+### 8.4 可调整的开关（Settings → Branches → `main` 规则）
 
-**Classic 分支保护**：Settings → Branches → Add branch protection rule
-- Branch name pattern：`main`
-- ☑ Require a pull request before merging
-  - Required approvals：`1`
-  - ☑ Dismiss stale pull request approvals when new commits are pushed
-  - ☑ Require review from Code Owners（仓库已有 `.github/CODEOWNERS`）
-- ☑ Require status checks to pass before merging
-  - 勾选 CI 的 `web` 与 `rust`
-  - ☑ Require branches to be up to date before merging
-- ☑ Require conversation resolution before merging
-- ☑ Do not allow bypassing the above settings
-- 关闭 Allow force pushes / Allow deletions
+- **连 owner 也必须走 PR**：勾选 “Do not allow bypassing the above settings”。注意：开启后你自己的 PR 也需要另一位协作者批准（适合已有 2 人以上维护者时）。
+- **放宽同步要求**：取消 “Require branches to be up to date before merging”。
+- **允许 Merge/Rebase**：Settings → General → Merge button（当前只允许 Squash）。
+- **紧急绕过**：当前 owner 作为管理员可以 bypass；操作后建议在 PR/Issue 里留记录。
 
-**Rulesets（新版界面）**：Settings → Rules → Rulesets → New branch ruleset
-- Target branches：`main`
-- Rules：Require a pull request（1 approval）+ Require status checks（`web`、`rust`）+ Block force pushes + Restrict deletions
-- Enforcement status：**Active**
+### 8.5 相关配置位置
 
-开启后：任何协作者（包括 Write 权限）直接 push main 都会被拒绝；PR 必须 **1 人 review + CI 全绿** 才能合并；即使管理员默认也不能绕过（如勾选 Do not allow bypassing）。
-
-#### 方案 C（不推荐）：Write 权限 + 团队口头约定
-
-给协作者 Write 权限、约定“必须走 PR”。在没有平台保护的情况下，这**不能阻止**对方直接 push main，只能事后 review/回滚。只适合完全信任的小团队临时使用。
-
-### 8.3 建议
-
-- **外部/外包/短期贡献者**：用方案 A（Read + Fork/PR），零成本，效果就是“你审核后才进 main”；
-- **长期核心成员、需要共享分支**：把仓库设为 Public（若内容可公开）或升级 Pro，然后用方案 B 的强制保护；
-- 需要我帮你切换哪种，直接说：我可以把仓库改成 Public 并立刻开保护，或按方案 A 更新邀请/文档。
+- 分支保护：GitHub 仓库 **Settings → Branches → Branch protection rules → `main`**
+- 代码负责人：`.github/CODEOWNERS`
+- CI：`.github/workflows/ci.yml`（`web`、`rust` 两个 job）
+- PR 模板：`.github/pull_request_template.md`
 
 ## 9. 出问题找谁
 

@@ -2,6 +2,8 @@
 
 > 把一段关系，做成一个还愿意陪你说说话的人。
 
+[![CI](https://github.com/202164690251/changzai/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/202164690251/changzai/actions/workflows/ci.yml)
+
 本仓库是「常在」的 **PC 单端（Windows 优先）** 实现：本地优先、单用户、用户自带模型 API、无服务端。
 当前进度：**Step 0（决策与准备）+ Step 1（技术底座 + 五项 spike）+ UI 重做（微信桌面版风格）**。
 
@@ -95,7 +97,7 @@ powershell -ExecutionPolicy Bypass -File scripts\build.ps1   # Windows 安装包
 
 仓库地址：<https://github.com/202164690251/changzai>
 
-- **main 审核后合并**：零成本方案是协作者给 **Read** 权限、Fork 后向 main 发 PR，你 review 后 Squash merge（他人无法直接 push/merge）；要把这条变成平台强制规则，需仓库 Public 或 GitHub Pro，配置见 [CONTRIBUTING §8](CONTRIBUTING.md#8-合并审核与-main-保护重要)；
+- **main 已开启强制分支保护**：直接 push 会被拒绝；必须 PR + 1 人 review（含 Code Owner）+ CI `web`/`rust` 全绿，Squash merge 后才能进 main。协作者邀请为 **Write** 即可（他们只能推分支/开 PR，推不了 main）。详见 [CONTRIBUTING §8](CONTRIBUTING.md#8-main-保护与合并审核已开启)；
 - 每位成员一个功能分支：`feat/<scope>-<short>` / `fix/<scope>-<short>` / `docs/<short>`；
 - 详细流程、提交规范、邀请协作者、数据隐私红线：见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
