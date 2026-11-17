@@ -39,6 +39,8 @@ jobs:
             echo "== $f"
             node --test "$f"
           done
+      - name: Eval harness
+        run: node scripts/eval.ts
       - name: Web build
         run: pnpm --filter @changzai/app build
 

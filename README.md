@@ -109,8 +109,10 @@ powershell -ExecutionPolicy Bypass -File scripts\build.ps1   # Windows 安装包
 | Step 5 撤回 | ✅ 菜单撤回 + 系统提示 + 限流 |
 | Step 5 主动消息 | ✅ 预算/免打扰 + LLM 生成 + Windows 通知（v0） |
 | Step 6 四步引导 | ✅ 18+ → 导入 → 人格卡 → 模型配置 |
-| Step 6 安全/备份 | ✅ 加密 .czbak 备份/恢复；一键销毁 DB/key/media；危机资源 |
-| Step 6 聊天壳增强 | ✅ 消息菜单（复制/删除/撤回）、最近 200 条窗口、夜间模式、90min 提醒 |
+| Step 6 安全/备份 | ✅ 启动 PIN；加密 .czbak（DB+key+媒体）；一键销毁（覆盖写）；危机资源 |
+| Step 6 聊天壳增强 | ✅ 可变高度虚拟滚动；复制/删除/引用/重新编辑/撤回；翻一翻；夜间模式；90min 提醒 |
+| Step 6 人格审阅 | ✅ 事实逐条移除/补充、保存、最多 10 版回滚 |
+| Step 7 评测骨架 | ✅ 黄金集 20 条 + `pnpm eval`（20/20 mock）；合规草案、发布说明、官网模板 |
 | 技术自检面板 | ✅ 从主界面移除；`#/dev` 或 Ctrl+Shift+D 进入开发页 |
 | 多端（iOS/Android） | ⏳ 本期不做（架构已保留） |
 
@@ -137,11 +139,11 @@ git switch -c feat/your-task
 4. 数据格式带 `schema_version`，迁移可重放；
 5. 调度（纯逻辑）与投递（平台实现）分离。
 
-## 接下来（Step 6 收尾 / Step 7）
+## 接下来（Step 7 外部动作）
 
-1. 启动 PIN、备份包含媒体、安全擦除说明；AI 披露的合规确认；
-2. 人格审阅逐条编辑/回滚、翻一翻、引用/撤回动画；
-3. DPI/输入法/小窗视觉走查；代码签名、MSI、自动更新；
-4. Step 7：盲测/情绪收益、内测、合规文档、GitHub Releases + 官网。
+1. 真人盲测（≥50%）、情绪收益问卷、负向放大率、3 家模型回归；
+2. 律师审阅隐私/协议/AI 披露；确认 AI 标识方案；
+3. 代码签名证书、MSI（需 WiX）、自动更新 endpoint + 密钥；
+4. DPI/多屏/输入法实机验收；GitHub Release + 官网上线。
 
-> Step 2–6 进度见 [docs/step2-progress.md](docs/step2-progress.md)、[docs/step3-progress.md](docs/step3-progress.md)、[docs/step4-progress.md](docs/step4-progress.md)、[docs/step5-progress.md](docs/step5-progress.md)、[docs/step6-progress.md](docs/step6-progress.md)。
+> Step 2–7 进度见 [docs/step2-progress.md](docs/step2-progress.md)、[docs/step3-progress.md](docs/step3-progress.md)、[docs/step4-progress.md](docs/step4-progress.md)、[docs/step5-progress.md](docs/step5-progress.md)、[docs/step6-progress.md](docs/step6-progress.md)、[docs/step7-plan.md](docs/step7-plan.md)。

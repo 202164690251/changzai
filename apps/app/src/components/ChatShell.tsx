@@ -8,6 +8,7 @@ import { useImport } from "../hooks/useImport.ts";
 import { useLlmConfig } from "../hooks/useLlmConfig.ts";
 import { useMediaImport } from "../hooks/useMediaImport.ts";
 import { useOnboarding } from "../hooks/useOnboarding.ts";
+import { usePin } from "../hooks/usePin.ts";
 import { usePersona } from "../hooks/usePersona.ts";
 import { useProactive } from "../hooks/useProactive.ts";
 import { useProfile } from "../hooks/useProfile.ts";
@@ -25,6 +26,8 @@ import { ImportWizard } from "./ImportWizard.tsx";
 import { MessageList } from "./MessageList.tsx";
 import { NavRail, type RailTab } from "./NavRail.tsx";
 import { Onboarding } from "./Onboarding.tsx";
+import { MemoryModal } from "./MemoryModal.tsx";
+import { LockScreen } from "./LockScreen.tsx";
 import { SettingsDrawer } from "./SettingsDrawer.tsx";
 import { SidePanel } from "./SidePanel.tsx";
 import { Toast } from "./Toast.tsx";
@@ -37,6 +40,7 @@ export function ChatShell(): ReactElement {
   const emotion = useEmotion();
   const analytics = useAnalytics();
   const onboarding = useOnboarding();
+  const pin = usePin();
   const { profile, storageError, setName, setAvatar, reset } = useProfile(db.ready);
   const { toast, show } = useToast();
   const { messages, typing, unread, sendText, sendImage, appendImported, appendProactive, recallLastMessage, deleteMessage, clear, markRead } = useChat({
@@ -61,6 +65,8 @@ export function ChatShell(): ReactElement {
   const [safetyMessage, setSafetyMessage] = useState<string | null>(null);
   const [messageMenu, setMessageMenu] = useState<{ message: ChatMsg; x: number; y: number } | null>(null);
   const [reminder, setReminder] = useState(false);
+  const [memoryOpen, setMemoryOpen] = useState(false);
+  const [insertDraft, setInsertDraft] = useState<{ id: number; text: string } | null>(null);
   const night = new Date().getHours() >= 23 || new Date().getHours() < 7;
   const importer = useImport(async (result) => {
     await db.refresh();
@@ -288,6 +294,7 @@ export function ChatShell(): ReactElement {
           typing={typing}
           onOpenSettings={() => setSettingsOpen(true)}
           onRecall={recallLastMessage}
+          onMemory={() => setMemoryOpen(true)}
         />
         {reminder && (
           <div className="safety-banner">
@@ -308,7 +315,12 @@ export function ChatShell(): ReactElement {
           onPreview={setPreview}
           onMessageMenu={(message, event) => setMessageMenu({ message, x: event.clientX, y: event.clientY })}
         />
-        <Composer onSend={handleSend} onPickImage={handlePickImage} onUnavailable={handleUnavailable} />
+        <Composer
+          onSend={handleSend}
+          onPickImage={handlePickImage}
+          onUnavailable={handleUnavailable}
+          insert={insertDraft}
+        />
       </main>
 
       {settingsOpen && (
@@ -364,6 +376,21 @@ export function ChatShell(): ReactElement {
           onDestroy={(confirm) => {
             void handleDestroy(confirm);
           }}
+          pinEnabled={pin.enabled}
+          pinError={pin.error}
+          onSetPin={(value) => {
+            void pin.setPin(value);
+          }}
+          onDisablePin={(value) => {
+            void pin.disable(value);
+          }}
+          personaHistoryCount={persona.historyCount}
+          onUpdateFacts={(facts) => {
+            void persona.updateFacts(facts);
+          }}
+          onRollbackPersona={() => {
+            void persona.rollback();
+          }}
         />
       )}
 
@@ -375,6 +402,17 @@ export function ChatShell(): ReactElement {
         onRun={importer.run}
         onReset={importer.reset}
         onClose={closeImport}
+      />
+
+      <LockScreen
+        open={pin.locked}
+        error={pin.error}
+        onUnlock={pin.unlock}
+        onForgot={() => {
+          if (window.confirm("忘记 PIN 只能删除本机数据。确认删除？")) {
+            void api.dataDestroy("删除").then(() => window.location.reload());
+          }
+        }}
       />
 
       <Onboarding
@@ -409,6 +447,33 @@ export function ChatShell(): ReactElement {
                 复制
               </button>
             )}
+            {messageMenu.message.kind === "text" && (
+              <button
+                type="button"
+                onClick={() => {
+                  setInsertDraft({
+                    id: Date.now(),
+                    text: `「${messageMenu.message.kind === "text" ? messageMenu.message.text : ""}」\
+`,
+                  });
+                  setMessageMenu(null);
+                }}
+              >
+                引用
+              </button>
+            )}
+            {messageMenu.message.from === "me" && messageMenu.message.kind === "text" && (
+              <button
+                type="button"
+                onClick={() => {
+                  deleteMessage(messageMenu.message.id);
+                  setInsertDraft({ id: Date.now(), text: messageMenu.message.kind === "text" ? messageMenu.message.text : "" });
+                  setMessageMenu(null);
+                }}
+              >
+                重新编辑
+              </button>
+            )}
             {messageMenu.message.from === "her" && (
               <button
                 type="button"
@@ -432,6 +497,12 @@ export function ChatShell(): ReactElement {
           </div>
         </div>
       )}
+
+      <MemoryModal
+        open={memoryOpen}
+        samples={persona.profile?.samples ?? []}
+        onClose={() => setMemoryOpen(false)}
+      />
 
       <ImageLightbox image={preview} onClose={() => setPreview(null)} />
       <Toast text={toast?.text ?? null} />

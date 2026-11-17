@@ -89,7 +89,11 @@ pub fn run() {
             llm::llm_chat_stream,
             safety::backup_export,
             safety::backup_restore,
-            safety::data_destroy
+            safety::data_destroy,
+            safety::pin_set,
+            safety::pin_verify,
+            safety::pin_disable,
+            safety::pin_enabled
         ])
         .setup(|app| {
             // 托盘常驻：关闭窗口 = 隐藏，进程继续跑（主动消息的前提）

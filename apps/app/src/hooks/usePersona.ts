@@ -16,6 +16,10 @@ export interface PersonaApi {
   buildFromImport: (messages: PersonaSourceMessage[]) => Promise<void>;
   /** 从数据库已有消息重建（设置页手动触发） */
   rebuildFromDb: () => Promise<void>;
+  /** 审阅：保存编辑后的事实列表 */
+  updateFacts: (facts: PersonaProfile["facts"]) => Promise<void>;
+  historyCount: number;
+  rollback: () => Promise<void>;
 }
 
 function isPersonaProfile(value: unknown): value is PersonaProfile {
@@ -40,6 +44,7 @@ export function usePersona(): PersonaApi {
   const [ready, setReady] = useState(!isTauri());
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [history, setHistory] = useState<PersonaProfile[]>([]);
 
   useEffect(() => {
     if (!isTauri()) return;
@@ -48,6 +53,13 @@ export function usePersona(): PersonaApi {
       try {
         const raw = await api.personaLoad();
         if (alive && isPersonaProfile(raw)) setProfile(raw);
+        const historyRaw = await api.settingGet("persona.history");
+        if (alive && historyRaw !== null) {
+          const parsed: unknown = JSON.parse(historyRaw);
+          if (Array.isArray(parsed)) {
+            setHistory(parsed.filter(isPersonaProfile).slice(-10));
+          }
+        }
       } catch {
         /* 没有/损坏时保持 null */
       } finally {
@@ -60,6 +72,13 @@ export function usePersona(): PersonaApi {
   }, []);
 
   const persist = useCallback(async (next: PersonaProfile): Promise<void> => {
+    if (profile !== null) {
+      const previousHistory = [...history, profile].slice(-10);
+      setHistory(previousHistory);
+      if (isTauri()) {
+        void api.settingSet("persona.history", JSON.stringify(previousHistory)).catch(() => undefined);
+      }
+    }
     setProfile(next);
     try {
       await api.personaSave(next);
@@ -67,7 +86,7 @@ export function usePersona(): PersonaApi {
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "人格卡保存失败");
     }
-  }, []);
+  }, [history, profile]);
 
   const buildFromImport = useCallback(
     async (messages: PersonaSourceMessage[]): Promise<void> => {
@@ -103,5 +122,33 @@ export function usePersona(): PersonaApi {
     }
   }, [persist]);
 
-  return { profile, ready, busy, message, buildFromImport, rebuildFromDb };
+  const updateFacts = useCallback(
+    async (facts: PersonaProfile["facts"]): Promise<void> => {
+      if (profile === null) return;
+      await persist({ ...profile, facts, built_at: Date.now() });
+      setMessage("人格卡事实已保存；下一轮生效。");
+    },
+    [persist, profile],
+  );
+
+  const rollback = useCallback(async (): Promise<void> => {
+    const previous = history[history.length - 1];
+    if (!previous) {
+      setMessage("没有可回滚的历史版本");
+      return;
+    }
+    setHistory(history.slice(0, -1));
+    setProfile(previous);
+    try {
+      await api.personaSave(previous);
+      if (isTauri()) {
+        void api.settingSet("persona.history", JSON.stringify(history.slice(0, -1))).catch(() => undefined);
+      }
+      setMessage("已回滚到上一版人格卡");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "回滚失败");
+    }
+  }, [history]);
+
+  return { profile, ready, busy, message, buildFromImport, rebuildFromDb, updateFacts, historyCount: history.length, rollback };
 }

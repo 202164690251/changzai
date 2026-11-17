@@ -362,6 +362,22 @@ export const api = {
     requireTauri();
     return invoke<DestroyResult>("data_destroy", { confirm });
   },
+  async pinSet(pin: string): Promise<boolean> {
+    requireTauri();
+    return invoke<boolean>("pin_set", { pin });
+  },
+  async pinVerify(pin: string): Promise<boolean> {
+    requireTauri();
+    return invoke<boolean>("pin_verify", { pin });
+  },
+  async pinDisable(pin: string): Promise<boolean> {
+    requireTauri();
+    return invoke<boolean>("pin_disable", { pin });
+  },
+  async pinEnabled(): Promise<boolean> {
+    requireTauri();
+    return invoke<boolean>("pin_enabled");
+  },
   async memoryCount(): Promise<number> {
     requireTauri();
     return invoke<number>("memory_count");

@@ -30,4 +30,5 @@ export * from "./runtime/proactive.ts";
 export * from "./runtime/compose.ts";
 export * from "./llm/presets.ts";
 export * from "./media/index.ts";
+export * from "./eval/metrics.ts";
 export * from "./db/ddl.ts";

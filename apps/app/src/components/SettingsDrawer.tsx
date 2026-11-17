@@ -46,6 +46,13 @@ export interface SettingsDrawerProps {
   onBackup: (passphrase: string) => void;
   onRestore: (passphrase: string) => void;
   onDestroy: (confirm: string) => void;
+  pinEnabled: boolean;
+  pinError: string | null;
+  onSetPin: (pin: string) => void;
+  onDisablePin: (pin: string) => void;
+  personaHistoryCount: number;
+  onUpdateFacts: (facts: PersonaProfile["facts"]) => void;
+  onRollbackPersona: () => void;
 }
 
 /** 设置抽屉：双方昵称/头像、回忆素材导入、使用说明。 */
@@ -87,6 +94,13 @@ export function SettingsDrawer({
   onBackup,
   onRestore,
   onDestroy,
+  pinEnabled,
+  pinError,
+  onSetPin,
+  onDisablePin,
+  personaHistoryCount,
+  onUpdateFacts,
+  onRollbackPersona,
 }: SettingsDrawerProps): ReactElement {
   const herInputRef = useRef<HTMLInputElement | null>(null);
   const meInputRef = useRef<HTMLInputElement | null>(null);
@@ -99,6 +113,13 @@ export function SettingsDrawer({
   const [temperature, setTemperature] = useState(String(llmConfig.temperature));
   const [backupPass, setBackupPass] = useState("");
   const [destroyConfirm, setDestroyConfirm] = useState("");
+  const [pinDraft, setPinDraft] = useState("");
+  const [factsDraft, setFactsDraft] = useState<PersonaProfile["facts"]>(persona?.facts ?? []);
+  const [factDraft, setFactDraft] = useState("");
+
+  useEffect(() => {
+    setFactsDraft(persona?.facts ?? []);
+  }, [persona]);
 
   useEffect(() => {
     setProvider(llmConfig.provider);
@@ -358,6 +379,57 @@ export function SettingsDrawer({
             ) : (
               <p className="settings-hint">导入聊天记录后会自动生成人格卡；也可以从已有消息手动重建。</p>
             )}
+            {persona !== null && persona.source.her_messages > 0 && (
+              <details className="persona-review">
+                <summary>逐条审阅事实（{factsDraft.length} 条）</summary>
+                <ul className="usage-list">
+                  {factsDraft.map((fact, index) => (
+                    <li key={`${fact.kind}-${fact.text}-${index}`}>
+                      {fact.kind}：{fact.text}
+                      <button
+                        type="button"
+                        className="link-btn"
+                        onClick={() => setFactsDraft(factsDraft.filter((_, position) => position !== index))}
+                      >
+                        移除
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                <div className="media-actions">
+                  <input
+                    className="text-input"
+                    value={factDraft}
+                    placeholder="补充一条事实，如：喜欢雨天"
+                    onChange={(event) => setFactDraft(event.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className="btn"
+                    disabled={factDraft.trim().length < 2}
+                    onClick={() => {
+                      setFactsDraft([...factsDraft, { kind: "补充", text: factDraft.trim() }]);
+                      setFactDraft("");
+                    }}
+                  >
+                    添加
+                  </button>
+                </div>
+                <div className="media-actions">
+                  <button type="button" className="btn primary" onClick={() => onUpdateFacts(factsDraft)}>
+                    保存审阅
+                  </button>
+                  <button
+                    type="button"
+                    className="btn"
+                    disabled={personaHistoryCount === 0}
+                    onClick={onRollbackPersona}
+                  >
+                    回滚上一版
+                  </button>
+                </div>
+              </details>
+            )}
             <p className="settings-note">
               当前状态：{weatherLabel(emotion.weather)} · 亲近度 {emotion.closeness.toFixed(2)} · 紧张度{" "}
               {emotion.tension.toFixed(2)}
@@ -465,6 +537,35 @@ export function SettingsDrawer({
                 恢复备份
               </button>
             </div>
+            <label className="settings-field">
+              <span className="field-label">
+                启动 PIN（4–8 位数字）{pinEnabled ? " · 已开启" : " · 未开启"}
+              </span>
+              <input
+                className="text-input"
+                type="password"
+                inputMode="numeric"
+                maxLength={8}
+                value={pinDraft}
+                onChange={(event) => setPinDraft(event.target.value.replace(/\D/g, ""))}
+                placeholder={pinEnabled ? "输入当前 PIN 关闭" : "设置启动 PIN"}
+              />
+            </label>
+            <div className="media-actions">
+              <button
+                type="button"
+                className="btn"
+                disabled={pinDraft.length < 4}
+                onClick={() => {
+                  if (pinEnabled) onDisablePin(pinDraft);
+                  else onSetPin(pinDraft);
+                  setPinDraft("");
+                }}
+              >
+                {pinEnabled ? "关闭 PIN" : "设置 PIN"}
+              </button>
+            </div>
+            {pinError !== null && <p className="settings-warn">{pinError}</p>}
             <label className="settings-field">
               <span className="field-label">销毁本机数据：输入「删除」确认</span>
               <input
