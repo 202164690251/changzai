@@ -2,21 +2,28 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   applyStimulus,
   assessAndDecide,
-  buildRuntimeMessages,
+  buildComposedMessages,
+  canRecall,
   classifyStimulus,
+  decideReply,
   decayEmotion,
   determineScene,
   detectOpenLoops,
+  filterAiFlavor,
   guardUserMessage,
   planArc,
+  recallLast,
+  recordRecall,
   retrieveMemories,
+  splitSegments,
+  DEFAULT_RECALL_BUDGET,
   type EmotionState,
   type MemoryCandidate,
   type PersonaProfile,
 } from "@changzai/core";
 import { DEMO_VOICE_SECONDS, demoImageDataUrl, demoVoiceDataUrl } from "../lib/demoMedia.ts";
 import { formatTimeDivider } from "../lib/time.ts";
-import { api, type ImportedMediaFile, type LlmConfig } from "../lib/tauri.ts";
+import { api, isTauri, type ImportedMediaFile, type LlmConfig } from "../lib/tauri.ts";
 
 export type ChatSender = "her" | "me";
 
@@ -107,6 +114,8 @@ export interface ChatApi {
   sendText: (text: string) => void;
   sendImage: (dataUrl: string, name?: string) => void;
   appendImported: (files: ImportedMediaFile[]) => void;
+  appendProactive: (text: string) => void;
+  recallLastMessage: () => boolean;
   clear: () => void;
   markRead: () => void;
 }
@@ -128,6 +137,7 @@ export function useChat(options: ChatOptions): ChatApi {
   const [unread, setUnread] = useState(2);
   const counter = useRef(0);
   const replyTimer = useRef<number | null>(null);
+  const recallTimestamps = useRef<number[]>([]);
 
   const nextId = useCallback((): string => {
     counter.current += 1;
@@ -193,8 +203,41 @@ export function useChat(options: ChatOptions): ChatApi {
       const nextEmotion = applyStimulus(decayed, classifyStimulus(userText), intensity, now);
       options.onEmotion(nextEmotion);
 
+      const decision = decideReply({ text: userText, emotion: nextEmotion, now });
+      if (!decision.reply) {
+        setTyping(false);
+        return;
+      }
+
       const replyId = nextId();
       let started = false;
+      const finalize = (full: string): void => {
+        const filtered = filterAiFlavor(full).text;
+        const segments = splitSegments(filtered);
+        if (segments.length === 0) return;
+        const first = segments[0]!;
+        if (!started) {
+          started = true;
+          setMessages((previous) => [
+            ...previous,
+            { id: replyId, from: "her", kind: "text", text: first, ts: Date.now() },
+          ]);
+        } else {
+          setMessages((previous) =>
+            previous.map((message) =>
+              message.id === replyId && message.kind === "text" ? { ...message, text: first } : message,
+            ),
+          );
+        }
+        segments.slice(1).forEach((segment, index) => {
+          window.setTimeout(() => {
+            setMessages((previous) => [
+              ...previous,
+              { id: `${replyId}-s${index + 1}`, from: "her", kind: "text", text: segment, ts: Date.now() },
+            ]);
+          }, 350 * (index + 1));
+        });
+      };
       void (async () => {
         let memories: ReturnType<typeof retrieveMemories> = [];
         try {
@@ -210,7 +253,7 @@ export function useChat(options: ChatOptions): ChatApi {
         } catch {
           /* 记忆不可用时退化为无记忆 */
         }
-        const runtime = buildRuntimeMessages({
+        const runtime = buildComposedMessages({
           persona,
           emotion: nextEmotion,
           arc,
@@ -224,6 +267,7 @@ export function useChat(options: ChatOptions): ChatApi {
           profile: { name: options.herName, selfName: options.meName },
         });
 
+        await new Promise((resolve) => window.setTimeout(resolve, decision.delayMs));
         await api
           .llmChatStream(
             runtime.messages.map((message) => ({ role: message.role, content: message.content })),
@@ -250,7 +294,7 @@ export function useChat(options: ChatOptions): ChatApi {
                 options.onNotice?.(event.text);
               } else if (event.kind === "done") {
                 setTyping(false);
-                if (!started) options.onNotice?.("模型没有返回内容，请检查模型名或额度");
+                finalize(event.text);
               }
             },
           )
@@ -298,6 +342,45 @@ export function useChat(options: ChatOptions): ChatApi {
     [nextId],
   );
 
+  const appendProactive = useCallback(
+    (text: string) => {
+      const value = text.trim();
+      if (!value) return;
+      setMessages((previous) => [
+        ...previous,
+        { id: nextId(), from: "her", kind: "text", text: value, ts: Date.now() },
+      ]);
+      setUnread((previous) => previous + 1);
+    },
+    [nextId],
+  );
+
+  const recallLastMessage = useCallback((): boolean => {
+    const now = Date.now();
+    const check = canRecall({ timestamps: recallTimestamps.current }, now, DEFAULT_RECALL_BUDGET);
+    if (!check.ok) {
+      options.onNotice?.(check.reason);
+      return false;
+    }
+    const result = recallLast(messages as unknown as Array<{ id: string; from: "her" | "me" | "system"; kind: string; text?: string; ts: number }>, now);
+    if (!result.recalled) {
+      options.onNotice?.("现在没有可撤回的消息");
+      return false;
+    }
+    recallTimestamps.current = recordRecall({ timestamps: recallTimestamps.current }, now).timestamps;
+    if (isTauri()) {
+      void api
+        .settingSet("recall.timestamps", JSON.stringify(recallTimestamps.current))
+        .catch(() => undefined);
+    }
+    const nextMessages = result.systemNotice
+      ? [...result.messages, result.systemNotice]
+      : result.messages;
+    setMessages(nextMessages as unknown as ChatMsg[]);
+    options.onNotice?.("已撤回一条消息");
+    return true;
+  }, [messages, options]);
+
   const appendImported = useCallback(
     (files: ImportedMediaFile[]) => {
       if (files.length === 0) return;
@@ -344,7 +427,29 @@ export function useChat(options: ChatOptions): ChatApi {
   const markRead = useCallback(() => setUnread(0), []);
 
   return useMemo(
-    () => ({ messages, typing, unread, sendText, sendImage, appendImported, clear, markRead }),
-    [messages, typing, unread, sendText, sendImage, appendImported, clear, markRead],
+    () => ({
+      messages,
+      typing,
+      unread,
+      sendText,
+      sendImage,
+      appendImported,
+      appendProactive,
+      recallLastMessage,
+      clear,
+      markRead,
+    }),
+    [
+      messages,
+      typing,
+      unread,
+      sendText,
+      sendImage,
+      appendImported,
+      appendProactive,
+      recallLastMessage,
+      clear,
+      markRead,
+    ],
   );
 }

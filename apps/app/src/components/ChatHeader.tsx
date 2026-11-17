@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { ReactElement } from "react";
 import type { PersonProfile } from "../lib/profile.ts";
 import { Avatar } from "./Avatar.tsx";
@@ -7,10 +8,12 @@ export interface ChatHeaderProps {
   her: PersonProfile;
   typing: boolean;
   onOpenSettings: () => void;
+  onRecall: () => void;
 }
 
 /** 52px 聊天标题栏：左边她的头像、名字、在线状态；右边「⋯」。 */
-export function ChatHeader({ her, typing, onOpenSettings }: ChatHeaderProps): ReactElement {
+export function ChatHeader({ her, typing, onOpenSettings, onRecall }: ChatHeaderProps): ReactElement {
+  const [menuOpen, setMenuOpen] = useState(false);
   return (
     <header className="chat-header">
       <div className="chat-header-id">
@@ -23,15 +26,41 @@ export function ChatHeader({ her, typing, onOpenSettings }: ChatHeaderProps): Re
           </span>
         </div>
       </div>
-      <button
-        type="button"
-        className="icon-btn"
-        title="聊天设置"
-        aria-label="聊天设置"
-        onClick={onOpenSettings}
-      >
-        <Icon name="more" size={20} />
-      </button>
+      <div className="chat-header-actions">
+        <button
+          type="button"
+          className="icon-btn"
+          title="聊天菜单"
+          aria-label="聊天菜单"
+          onClick={() => setMenuOpen((open) => !open)}
+        >
+          <Icon name="more" size={20} />
+        </button>
+        {menuOpen && (
+          <div className="chat-menu" role="menu">
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setMenuOpen(false);
+                onRecall();
+              }}
+            >
+              撤回上一条
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setMenuOpen(false);
+                onOpenSettings();
+              }}
+            >
+              聊天设置
+            </button>
+          </div>
+        )}
+      </div>
     </header>
   );
 }

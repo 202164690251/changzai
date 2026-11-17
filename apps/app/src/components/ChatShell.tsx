@@ -8,6 +8,7 @@ import { useImport } from "../hooks/useImport.ts";
 import { useLlmConfig } from "../hooks/useLlmConfig.ts";
 import { useMediaImport } from "../hooks/useMediaImport.ts";
 import { usePersona } from "../hooks/usePersona.ts";
+import { useProactive } from "../hooks/useProactive.ts";
 import { useProfile } from "../hooks/useProfile.ts";
 import { useToast } from "../hooks/useToast.ts";
 import { readChatImageFile } from "../lib/avatar.ts";
@@ -35,7 +36,7 @@ export function ChatShell(): ReactElement {
   const analytics = useAnalytics();
   const { profile, storageError, setName, setAvatar, reset } = useProfile(db.ready);
   const { toast, show } = useToast();
-  const { messages, typing, unread, sendText, sendImage, appendImported, clear, markRead } = useChat({
+  const { messages, typing, unread, sendText, sendImage, appendImported, appendProactive, recallLastMessage, clear, markRead } = useChat({
     persona: persona.profile,
     llm: llm.config,
     herName: displayName(profile.her, "ta"),
@@ -50,6 +51,9 @@ export function ChatShell(): ReactElement {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [preview, setPreview] = useState<PreviewImage | null>(null);
   const [importOpen, setImportOpen] = useState(false);
+  const [llmTesting, setLlmTesting] = useState(false);
+  const [llmTest, setLlmTest] = useState<{ ok: boolean; text: string; error: string } | null>(null);
+  const [lastUserAt, setLastUserAt] = useState(0);
   const importer = useImport(async (result) => {
     await db.refresh();
     await persona.buildFromImport(result.messages);
@@ -98,6 +102,19 @@ export function ChatShell(): ReactElement {
     importer.reset();
   }, [importer]);
 
+  const handleTestLlm = useCallback(async () => {
+    setLlmTesting(true);
+    setLlmTest(null);
+    try {
+      const result = await api.llmTest();
+      setLlmTest(result);
+    } catch (error) {
+      setLlmTest({ ok: false, text: "", error: error instanceof Error ? error.message : String(error) });
+    } finally {
+      setLlmTesting(false);
+    }
+  }, []);
+
   const handleImported = useCallback(
     (files: ImportedMediaFile[]) => {
       appendImported(files);
@@ -134,6 +151,7 @@ export function ChatShell(): ReactElement {
 
   const handleSend = useCallback(
     (text: string) => {
+      setLastUserAt(Date.now());
       analytics.log("message_me");
       if (!loggedFirst.current) {
         loggedFirst.current = true;
@@ -143,6 +161,20 @@ export function ChatShell(): ReactElement {
     },
     [analytics, sendText],
   );
+
+  const proactive = useProactive({
+    persona: persona.profile,
+    llm: llm.config,
+    herName: displayName(profile.her, "ta"),
+    meName: displayName(profile.me, "我"),
+    lastUserAt,
+    onMessage: (text) => {
+      appendProactive(text);
+      analytics.log("proactive_sent");
+      setRailTab("chat");
+    },
+    onNotice: show,
+  });
 
   const handlePickImage = useCallback(
     (file: File) => {
@@ -188,7 +220,12 @@ export function ChatShell(): ReactElement {
       )}
 
       <main className="chat-main">
-        <ChatHeader her={her} typing={typing} onOpenSettings={() => setSettingsOpen(true)} />
+        <ChatHeader
+          her={her}
+          typing={typing}
+          onOpenSettings={() => setSettingsOpen(true)}
+          onRecall={recallLastMessage}
+        />
         {messages.length === 0 && persona.profile !== null && (
           <div className="chat-ready-hint">已生成 ta 的人格卡，发一句试试。</div>
         )}
@@ -213,8 +250,13 @@ export function ChatShell(): ReactElement {
           onOpenImport={openImport}
           llmConfig={llm.config}
           llmStatus={llm.message}
+          llmTesting={llmTesting}
+          llmTest={llmTest}
           onSaveLlm={(config) => {
             void llm.save(config);
+          }}
+          onTestLlm={() => {
+            void handleTestLlm();
           }}
           persona={persona.profile}
           personaBusy={persona.busy}
@@ -226,6 +268,13 @@ export function ChatShell(): ReactElement {
           analyticsCounts={analytics.counts}
           analyticsTotal={analytics.total}
           onClearAnalytics={analytics.clear}
+          proactiveEnabled={proactive.state.enabled}
+          proactiveBusy={proactive.busy}
+          proactiveReason={proactive.planReason}
+          onToggleProactive={proactive.setEnabled}
+          onTestProactive={() => {
+            void proactive.test();
+          }}
         />
       )}
 

@@ -4,8 +4,10 @@ import { useCallback, useEffect, useState } from "react";
 import { api, isTauri, type LlmConfig } from "../lib/tauri.ts";
 
 export const DEFAULT_LLM_CONFIG: LlmConfig = {
+  provider: "deepseek",
   baseUrl: "https://api.deepseek.com/v1",
   model: "deepseek-chat",
+  fastModel: "deepseek-chat",
   apiKey: "",
   temperature: 0.85,
 };
