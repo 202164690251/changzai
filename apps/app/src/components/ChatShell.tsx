@@ -358,10 +358,12 @@ export function ChatShell(): ReactElement {
           analyticsCounts={analytics.counts}
           analyticsTotal={analytics.total}
           onClearAnalytics={analytics.clear}
-          proactiveEnabled={proactive.state.enabled}
+          proactiveState={proactive.state}
           proactiveBusy={proactive.busy}
           proactiveReason={proactive.planReason}
           onToggleProactive={proactive.setEnabled}
+          onSetProactiveDesire={proactive.setDesire}
+          onUpdateProactive={proactive.updateSettings}
           onTestProactive={() => {
             void proactive.test();
           }}

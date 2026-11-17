@@ -1783,3 +1783,13 @@ textarea:focus-visible {
     display: none;
   }
 }
+.proactive-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+@media (max-width: 520px) {
+  .proactive-grid {
+    grid-template-columns: 1fr;
+  }
+}

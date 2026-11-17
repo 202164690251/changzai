@@ -23,6 +23,7 @@ import {
   inDnd,
   normalizeProactiveState,
   planProactive,
+  applyProactivePreset,
   recordProactiveSent,
   recordUserReply,
   buildComposedMessages,
@@ -151,6 +152,19 @@ test("proactive：免打扰/预算/空闲/连续未回降频", () => {
   const reply = recordUserReply(state, BASE + 1000);
   assert.equal(reply.consecutiveNoReply, 0);
   assert.equal(normalizeProactiveState({ ...state, sentToday: 3, lastSentAt: BASE - 2 * 86_400_000 }, BASE).sentToday, 0);
+});
+
+test("proactive：三档欲望与自定义参数可调", () => {
+  const low = applyProactivePreset(DEFAULT_PROACTIVE_STATE, "low");
+  assert.equal(low.dailyLimit, 1);
+  assert.equal(low.minIdleMinutes, 180);
+  assert.equal(low.desireLevel, "low");
+  const high = applyProactivePreset(low, "high");
+  assert.equal(high.dailyLimit, 6);
+  assert.ok(high.triggerThreshold < low.triggerThreshold);
+  const custom = applyProactivePreset(high, "custom");
+  assert.equal(custom.dailyLimit, high.dailyLimit);
+  assert.equal(custom.desireLevel, "custom");
 });
 
 test("compose：叠加硬规则且保留 Step4 状态/记忆", () => {

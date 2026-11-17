@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent, ReactElement } from "react";
-import { LLM_PROVIDERS, findProvider, personaHeadline, describeEmotion, weatherLabel, type EmotionState, type PersonaProfile } from "@changzai/core";
+import { LLM_PROVIDERS, PROACTIVE_PRESETS, findProvider, personaHeadline, describeEmotion, weatherLabel, type EmotionState, type PersonaProfile, type ProactiveDesire, type ProactiveState } from "@changzai/core";
 import type { ImportState } from "../hooks/useMediaImport.ts";
 import { readAvatarFile } from "../lib/avatar.ts";
 import { MAX_NAME_LENGTH, displayName, type PersonKey, type Profile } from "../lib/profile.ts";
@@ -36,10 +36,12 @@ export interface SettingsDrawerProps {
   analyticsCounts: Record<string, number>;
   analyticsTotal: number;
   onClearAnalytics: () => void;
-  proactiveEnabled: boolean;
+  proactiveState: ProactiveState;
   proactiveBusy: boolean;
   proactiveReason: string;
   onToggleProactive: (enabled: boolean) => void;
+  onSetProactiveDesire: (level: ProactiveDesire) => void;
+  onUpdateProactive: (patch: Partial<ProactiveState>) => void;
   onTestProactive: () => void;
   safetyBusy: boolean;
   safetyMessage: string | null;
@@ -84,10 +86,12 @@ export function SettingsDrawer({
   analyticsCounts,
   analyticsTotal,
   onClearAnalytics,
-  proactiveEnabled,
+  proactiveState,
   proactiveBusy,
   proactiveReason,
   onToggleProactive,
+  onSetProactiveDesire,
+  onUpdateProactive,
   onTestProactive,
   safetyBusy,
   safetyMessage,
@@ -596,17 +600,171 @@ export function SettingsDrawer({
               <h3 id="settings-proactive">主动消息</h3>
             </header>
             <p className="settings-hint">
-              开启后，ta 会在你一段时间没说话时主动发一条（日上限 3，周 12，23:00–8:00 免打扰）。
-              关窗到托盘后由进程内定时器继续尝试；完全退出后不补发。
+              开启后，ta 会在你一段时间没说话时主动发一条。所有参数都可调；关窗到托盘后由进程内定时器继续尝试，完全退出后不补发。
             </p>
             <label className="settings-check">
               <input
                 type="checkbox"
-                checked={proactiveEnabled}
+                checked={proactiveState.enabled}
                 onChange={(event) => onToggleProactive(event.target.checked)}
               />
               <span>允许 ta 主动找我</span>
             </label>
+
+            <label className="settings-field">
+              <span className="field-label">主动欲望</span>
+              <select
+                className="text-input"
+                value={proactiveState.desireLevel}
+                onChange={(event) => onSetProactiveDesire(event.target.value as ProactiveDesire)}
+              >
+                <option value="low">克制 · 每天最多 1 条</option>
+                <option value="medium">适中 · 每天最多 3 条</option>
+                <option value="high">黏人 · 每天最多 6 条</option>
+                <option value="custom">自定义</option>
+              </select>
+            </label>
+            <p className="settings-hint">
+              {proactiveState.desireLevel === "custom"
+                ? "自定义：下面所有数值都由你决定。"
+                : PROACTIVE_PRESETS[proactiveState.desireLevel].description}
+            </p>
+
+            <div className="settings-form proactive-grid">
+              <label className="settings-field">
+                <span className="field-label">每日上限</span>
+                <input
+                  className="text-input"
+                  type="number"
+                  min={0}
+                  max={24}
+                  value={proactiveState.dailyLimit}
+                  onChange={(event) =>
+                    onUpdateProactive({ dailyLimit: Number(event.target.value), desireLevel: "custom" })
+                  }
+                />
+              </label>
+              <label className="settings-field">
+                <span className="field-label">每周上限</span>
+                <input
+                  className="text-input"
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={proactiveState.weeklyLimit}
+                  onChange={(event) =>
+                    onUpdateProactive({ weeklyLimit: Number(event.target.value), desireLevel: "custom" })
+                  }
+                />
+              </label>
+              <label className="settings-field">
+                <span className="field-label">免打扰开始（0–23）</span>
+                <input
+                  className="text-input"
+                  type="number"
+                  min={0}
+                  max={23}
+                  value={proactiveState.dndStart}
+                  onChange={(event) =>
+                    onUpdateProactive({ dndStart: Number(event.target.value), desireLevel: "custom" })
+                  }
+                />
+              </label>
+              <label className="settings-field">
+                <span className="field-label">免打扰结束（0–23）</span>
+                <input
+                  className="text-input"
+                  type="number"
+                  min={0}
+                  max={23}
+                  value={proactiveState.dndEnd}
+                  onChange={(event) =>
+                    onUpdateProactive({ dndEnd: Number(event.target.value), desireLevel: "custom" })
+                  }
+                />
+              </label>
+              <label className="settings-field">
+                <span className="field-label">最小空闲（分钟）</span>
+                <input
+                  className="text-input"
+                  type="number"
+                  min={5}
+                  max={720}
+                  value={proactiveState.minIdleMinutes}
+                  onChange={(event) =>
+                    onUpdateProactive({ minIdleMinutes: Number(event.target.value), desireLevel: "custom" })
+                  }
+                />
+              </label>
+              <label className="settings-field">
+                <span className="field-label">检查间隔（分钟）</span>
+                <input
+                  className="text-input"
+                  type="number"
+                  min={1}
+                  max={120}
+                  value={proactiveState.checkIntervalMinutes}
+                  onChange={(event) =>
+                    onUpdateProactive({ checkIntervalMinutes: Number(event.target.value), desireLevel: "custom" })
+                  }
+                />
+              </label>
+              <label className="settings-field">
+                <span className="field-label">欲望系数（0.1–2）</span>
+                <input
+                  className="text-input"
+                  type="number"
+                  min={0.1}
+                  max={2}
+                  step={0.1}
+                  value={proactiveState.desireFactor}
+                  onChange={(event) =>
+                    onUpdateProactive({ desireFactor: Number(event.target.value), desireLevel: "custom" })
+                  }
+                />
+              </label>
+              <label className="settings-field">
+                <span className="field-label">触发阈值（0.05–0.95）</span>
+                <input
+                  className="text-input"
+                  type="number"
+                  min={0.05}
+                  max={0.95}
+                  step={0.05}
+                  value={proactiveState.triggerThreshold}
+                  onChange={(event) =>
+                    onUpdateProactive({ triggerThreshold: Number(event.target.value), desireLevel: "custom" })
+                  }
+                />
+              </label>
+              <label className="settings-field">
+                <span className="field-label">活跃开始（0–23）</span>
+                <input
+                  className="text-input"
+                  type="number"
+                  min={0}
+                  max={23}
+                  value={proactiveState.activeStart}
+                  onChange={(event) =>
+                    onUpdateProactive({ activeStart: Number(event.target.value), desireLevel: "custom" })
+                  }
+                />
+              </label>
+              <label className="settings-field">
+                <span className="field-label">活跃结束（1–24）</span>
+                <input
+                  className="text-input"
+                  type="number"
+                  min={1}
+                  max={24}
+                  value={proactiveState.activeEnd}
+                  onChange={(event) =>
+                    onUpdateProactive({ activeEnd: Number(event.target.value), desireLevel: "custom" })
+                  }
+                />
+              </label>
+            </div>
+
             <div className="media-actions">
               <button type="button" className="btn" disabled={proactiveBusy} onClick={onTestProactive}>
                 {proactiveBusy ? "正在想说什么…" : "现在发一条试试"}
