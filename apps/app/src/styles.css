@@ -1836,3 +1836,133 @@ textarea:focus-visible {
   width: 100%;
   accent-color: var(--green);
 }
+/* v2.0 初始创建：三选一 / 8 模板 / 自定义 */
+.persona-start-root {
+  position: fixed;
+  inset: 0;
+  z-index: 65;
+  display: grid;
+  place-items: center;
+  background: rgba(245, 245, 245, 0.92);
+  padding: 24px;
+}
+.persona-start-card {
+  width: min(760px, 94vw);
+  max-height: 88vh;
+  overflow: auto;
+  background: var(--surface);
+  border-radius: 16px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.12);
+  padding: 22px 24px;
+}
+.persona-start-head,
+.persona-start-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+.persona-start-head strong {
+  display: block;
+  font-size: 15px;
+}
+.persona-start-head span {
+  color: var(--text-3);
+  font-size: 12px;
+}
+.persona-start-body h1 {
+  margin: 18px 0 6px;
+  font-size: 24px;
+}
+.persona-start-body h2 {
+  margin: 16px 0 8px;
+  font-size: 18px;
+}
+.persona-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin: 18px 0;
+}
+.persona-choice {
+  text-align: left;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel-bg);
+  padding: 16px;
+  cursor: pointer;
+}
+.persona-choice:hover {
+  border-color: var(--green);
+}
+.persona-choice b {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 14px;
+}
+.persona-choice span {
+  color: var(--text-2);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.persona-preset-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin: 14px 0;
+}
+.persona-preset {
+  text-align: left;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  background: var(--panel-bg);
+  cursor: pointer;
+}
+.persona-preset:hover,
+.persona-preset.selected {
+  border-color: var(--green);
+  background: rgba(7, 193, 96, 0.06);
+}
+.persona-preset b {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 13px;
+}
+.persona-preset span {
+  color: var(--text-2);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.persona-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px 0;
+}
+.persona-preview-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--panel-bg);
+  font-size: 13px;
+}
+.persona-preview-me {
+  color: var(--text-3);
+}
+.persona-preview-her {
+  color: var(--text);
+}
+.persona-start-body .settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+@media (max-width: 720px) {
+  .persona-choice-grid,
+  .persona-preset-grid {
+    grid-template-columns: 1fr;
+  }
+}

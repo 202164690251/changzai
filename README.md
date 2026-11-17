@@ -114,6 +114,7 @@ powershell -ExecutionPolicy Bypass -File scripts\build.ps1   # Windows 安装包
 | Step 6 人格审阅 | ✅ 事实逐条移除/补充、保存、最多 10 版回滚 |
 | Step 7 关系/状态/校准 | ✅ 关系卡自动总结+可编辑；ta 状态面板；主动消息秒级/不限/可关免打扰；风格校准默认关闭 |
 | Step 7 上下文持久化 | ✅ 聊天记录落 SQLCipher（重启恢复）；话题短摘要 + 记忆检索 + 先接上一句 |
+| V2.0 创建方式 | ✅ 初始界面三选一；8 个性格模板；结构化自定义；预设/自定义不依赖聊天记录 |
 | Step 7 评测骨架 | ✅ 黄金集 20 条 + `pnpm eval`（20/20 mock）；合规草案、发布说明、官网模板 |
 | 技术自检面板 | ✅ 从主界面移除；`#/dev` 或 Ctrl+Shift+D 进入开发页 |
 | 多端（iOS/Android） | ⏳ 本期不做（架构已保留） |
@@ -148,4 +149,4 @@ git switch -c feat/your-task
 3. 代码签名证书、MSI（需 WiX）、自动更新 endpoint + 密钥；
 4. DPI/多屏/输入法实机验收；GitHub Release + 官网上线。
 
-> Step 2–7 进度见 [docs/step2-progress.md](docs/step2-progress.md)、[docs/step3-progress.md](docs/step3-progress.md)、[docs/step4-progress.md](docs/step4-progress.md)、[docs/step5-progress.md](docs/step5-progress.md)、[docs/step6-progress.md](docs/step6-progress.md)、[docs/step7-plan.md](docs/step7-plan.md)。
+> Step 2–8 进度见 [docs/step2-progress.md](docs/step2-progress.md)、[docs/step3-progress.md](docs/step3-progress.md)、[docs/step4-progress.md](docs/step4-progress.md)、[docs/step5-progress.md](docs/step5-progress.md)、[docs/step6-progress.md](docs/step6-progress.md)、[docs/step7-plan.md](docs/step7-plan.md)、[docs/step8-v2.0-progress.md](docs/step8-v2.0-progress.md)。

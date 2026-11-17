@@ -119,6 +119,8 @@ export function buildChatMessages(
 
 /** 给 UI 展示的一行摘要 */
 export function personaHeadline(persona: PersonaProfile): string {
+  if (persona.origin === "preset") return "预设人格 · 本地模板";
+  if (persona.origin === "custom") return "自定义人格";
   if (persona.source.her_messages === 0) return "尚未生成人格卡";
   return `${persona.source.her_messages.toLocaleString("zh-CN")} 条 ta 的消息 · ${persona.source.span_days} 天 · ${
     persona.facts.length

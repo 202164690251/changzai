@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactElement } from "react";
+import { buildCustomRelationship, buildPresetRelationship, type CustomPersonaForm, type PersonaPreset } from "@changzai/core";
 import { useChat, lastMessageOf, messagePreview, type ChatMsg } from "../hooks/useChat.ts";
 import { useAnalytics } from "../hooks/useAnalytics.ts";
 import { useDatabase } from "../hooks/useDatabase.ts";
@@ -28,6 +29,7 @@ import { ImportWizard } from "./ImportWizard.tsx";
 import { MessageList } from "./MessageList.tsx";
 import { NavRail, type RailTab } from "./NavRail.tsx";
 import { Onboarding } from "./Onboarding.tsx";
+import { PersonaStart } from "./PersonaStart.tsx";
 import { MemoryModal } from "./MemoryModal.tsx";
 import { MoodPanel } from "./MoodPanel.tsx";
 import { StyleReviewModal } from "./StyleReviewModal.tsx";
@@ -78,10 +80,47 @@ export function ChatShell(): ReactElement {
   const [messageMenu, setMessageMenu] = useState<{ message: ChatMsg; x: number; y: number } | null>(null);
   const [reminder, setReminder] = useState(false);
   const [moodOpen, setMoodOpen] = useState(false);
+  const [personaStartOpen, setPersonaStartOpen] = useState(false);
   const [styleReview, setStyleReview] = useState<{ id: string; text: string } | null>(null);
   const [memoryOpen, setMemoryOpen] = useState(false);
   const [insertDraft, setInsertDraft] = useState<{ id: number; text: string } | null>(null);
   const night = new Date().getHours() >= 23 || new Date().getHours() < 7;
+
+  useEffect(() => {
+    if (onboarding.ready && onboarding.done && db.ready && persona.ready && !persona.profile) {
+      setPersonaStartOpen(true);
+    }
+  }, [db.ready, onboarding.done, onboarding.ready, persona.profile, persona.ready]);
+
+  const handleCreatePreset = useCallback(
+    async (preset: PersonaPreset): Promise<void> => {
+      const next = await persona.applyPreset(preset.id);
+      if (!next) return;
+      await relationship.save(buildPresetRelationship(preset, meName));
+      clear();
+      appendProactive(preset.greeting);
+      markRead();
+      await onboarding.complete();
+      setPersonaStartOpen(false);
+      show(`已用「${preset.label}」创建人格，可以开始聊天了`);
+    },
+    [appendProactive, clear, markRead, meName, onboarding, persona, relationship, show],
+  );
+
+  const handleCreateCustom = useCallback(
+    async (form: CustomPersonaForm): Promise<void> => {
+      const next = await persona.applyCustom(form);
+      if (!next) return;
+      await relationship.save(buildCustomRelationship(form, meName));
+      clear();
+      appendProactive("在的，今天想聊点什么？");
+      markRead();
+      await onboarding.complete();
+      setPersonaStartOpen(false);
+      show("自定义人格已创建，可以开始聊天了");
+    },
+    [appendProactive, clear, markRead, meName, onboarding, persona, relationship, show],
+  );
   const importer = useImport(async (result) => {
     await db.refresh();
     await persona.buildFromImport(result.messages);
@@ -395,6 +434,7 @@ export function ChatShell(): ReactElement {
           onToggleStyleReview={styleFeedback.setEnabled}
           onClearStyleFeedback={styleFeedback.clear}
           onOpenMood={() => setMoodOpen(true)}
+          onOpenPersonaStart={() => setPersonaStartOpen(true)}
           analyticsCounts={analytics.counts}
           analyticsTotal={analytics.total}
           onClearAnalytics={analytics.clear}
@@ -473,6 +513,22 @@ export function ChatShell(): ReactElement {
         }}
         onFinish={onboarding.complete}
         onSkip={onboarding.complete}
+        onSkipToPreset={() => {
+          void onboarding.complete();
+          setPersonaStartOpen(true);
+        }}
+      />
+
+      <PersonaStart
+        open={personaStartOpen}
+        busy={persona.busy}
+        onImport={() => {
+          setPersonaStartOpen(false);
+          openImport();
+        }}
+        onCreatePreset={handleCreatePreset}
+        onCreateCustom={handleCreateCustom}
+        onSkip={() => setPersonaStartOpen(false)}
       />
 
       {messageMenu !== null && (

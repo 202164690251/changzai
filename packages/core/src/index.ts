@@ -16,6 +16,7 @@ export * from "./ingest/adapters/qq-txt.ts";
 export * from "./ingest/adapters/chatdata-js.ts";
 export * from "./ingest/pipeline.ts";
 export * from "./persona/types.ts";
+export * from "./persona/presets.ts";
 export * from "./persona/relationship.ts";
 export * from "./persona/styleFeedback.ts";
 export * from "./persona/build.ts";
