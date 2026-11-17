@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent, ReactElement } from "react";
-import { personaHeadline, describeEmotion, weatherLabel, type EmotionState, type PersonaProfile } from "@changzai/core";
+import { LLM_PROVIDERS, findProvider, personaHeadline, describeEmotion, weatherLabel, type EmotionState, type PersonaProfile } from "@changzai/core";
 import type { ImportState } from "../hooks/useMediaImport.ts";
 import { readAvatarFile } from "../lib/avatar.ts";
 import { MAX_NAME_LENGTH, displayName, type PersonKey, type Profile } from "../lib/profile.ts";
@@ -24,7 +24,10 @@ export interface SettingsDrawerProps {
   onOpenImport: () => void;
   llmConfig: LlmConfig;
   llmStatus: string | null;
+  llmTesting: boolean;
+  llmTest: { ok: boolean; text: string; error: string } | null;
   onSaveLlm: (config: LlmConfig) => void;
+  onTestLlm: (config: LlmConfig) => void;
   persona: PersonaProfile | null;
   personaBusy: boolean;
   personaMessage: string | null;
@@ -33,6 +36,11 @@ export interface SettingsDrawerProps {
   analyticsCounts: Record<string, number>;
   analyticsTotal: number;
   onClearAnalytics: () => void;
+  proactiveEnabled: boolean;
+  proactiveBusy: boolean;
+  proactiveReason: string;
+  onToggleProactive: (enabled: boolean) => void;
+  onTestProactive: () => void;
 }
 
 /** 设置抽屉：双方昵称/头像、回忆素材导入、使用说明。 */
@@ -52,7 +60,10 @@ export function SettingsDrawer({
   onOpenImport,
   llmConfig,
   llmStatus,
+  llmTesting,
+  llmTest,
   onSaveLlm,
+  onTestLlm,
   persona,
   personaBusy,
   personaMessage,
@@ -61,18 +72,27 @@ export function SettingsDrawer({
   analyticsCounts,
   analyticsTotal,
   onClearAnalytics,
+  proactiveEnabled,
+  proactiveBusy,
+  proactiveReason,
+  onToggleProactive,
+  onTestProactive,
 }: SettingsDrawerProps): ReactElement {
   const herInputRef = useRef<HTMLInputElement | null>(null);
   const meInputRef = useRef<HTMLInputElement | null>(null);
   const [avatarError, setAvatarError] = useState<string | null>(null);
+  const [provider, setProvider] = useState(llmConfig.provider);
   const [baseUrl, setBaseUrl] = useState(llmConfig.baseUrl);
   const [model, setModel] = useState(llmConfig.model);
+  const [fastModel, setFastModel] = useState(llmConfig.fastModel);
   const [apiKey, setApiKey] = useState(llmConfig.apiKey);
   const [temperature, setTemperature] = useState(String(llmConfig.temperature));
 
   useEffect(() => {
+    setProvider(llmConfig.provider);
     setBaseUrl(llmConfig.baseUrl);
     setModel(llmConfig.model);
+    setFastModel(llmConfig.fastModel);
     setApiKey(llmConfig.apiKey);
     setTemperature(String(llmConfig.temperature));
   }, [llmConfig]);
@@ -212,6 +232,26 @@ export function SettingsDrawer({
             </p>
             <div className="settings-form">
               <label className="settings-field">
+                <span className="field-label">服务商</span>
+                <select
+                  className="text-input"
+                  value={provider}
+                  onChange={(event) => {
+                    const preset = findProvider(event.target.value);
+                    setProvider(preset.id);
+                    if (preset.baseUrl) setBaseUrl(preset.baseUrl);
+                    if (preset.models[0]) setModel(preset.models[0]);
+                    if (preset.fastModel) setFastModel(preset.fastModel);
+                  }}
+                >
+                  {LLM_PROVIDERS.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="settings-field">
                 <span className="field-label">Base URL</span>
                 <input
                   className="text-input"
@@ -221,12 +261,21 @@ export function SettingsDrawer({
                 />
               </label>
               <label className="settings-field">
-                <span className="field-label">模型</span>
+                <span className="field-label">主模型</span>
                 <input
                   className="text-input"
                   value={model}
                   placeholder="deepseek-chat"
                   onChange={(event) => setModel(event.target.value)}
+                />
+              </label>
+              <label className="settings-field">
+                <span className="field-label">快速模型（摘要/标注用）</span>
+                <input
+                  className="text-input"
+                  value={fastModel}
+                  placeholder="deepseek-chat"
+                  onChange={(event) => setFastModel(event.target.value)}
                 />
               </label>
               <label className="settings-field">
@@ -259,8 +308,10 @@ export function SettingsDrawer({
                 className="btn primary"
                 onClick={() =>
                   onSaveLlm({
+                    provider,
                     baseUrl: baseUrl.trim(),
                     model: model.trim(),
+                    fastModel: fastModel.trim(),
                     apiKey: apiKey.trim(),
                     temperature: Math.min(2, Math.max(0, Number(temperature) || 0.85)),
                   })
@@ -268,8 +319,16 @@ export function SettingsDrawer({
               >
                 保存模型配置
               </button>
+              <button type="button" className="btn" disabled={llmTesting} onClick={() => onTestLlm({ provider, baseUrl: baseUrl.trim(), model: model.trim(), fastModel: fastModel.trim(), apiKey: apiKey.trim(), temperature: Math.min(2, Math.max(0, Number(temperature) || 0.85)) })}>
+                {llmTesting ? "测试中…" : "测一下"}
+              </button>
             </div>
             {llmStatus !== null && <p className="settings-note">{llmStatus}</p>}
+            {llmTest !== null && (
+              <p className={`settings-message ${llmTest.ok ? "ok" : "bad"}`}>
+                {llmTest.ok ? `✅ ${llmTest.text}` : `❌ ${llmTest.error || llmTest.text || "测试失败"}`}
+              </p>
+            )}
           </section>
 
           <section className="settings-section" aria-labelledby="settings-persona">
@@ -352,6 +411,30 @@ export function SettingsDrawer({
               <li>我发出的消息：{analyticsCounts.message_me ?? 0} 条</li>
               <li>总计事件：{analyticsTotal} 条</li>
             </ul>
+          </section>
+
+          <section className="settings-section" aria-labelledby="settings-proactive">
+            <header className="settings-section-head">
+              <h3 id="settings-proactive">主动消息</h3>
+            </header>
+            <p className="settings-hint">
+              开启后，ta 会在你一段时间没说话时主动发一条（日上限 3，周 12，23:00–8:00 免打扰）。
+              关窗到托盘后由进程内定时器继续尝试；完全退出后不补发。
+            </p>
+            <label className="settings-check">
+              <input
+                type="checkbox"
+                checked={proactiveEnabled}
+                onChange={(event) => onToggleProactive(event.target.checked)}
+              />
+              <span>允许 ta 主动找我</span>
+            </label>
+            <div className="media-actions">
+              <button type="button" className="btn" disabled={proactiveBusy} onClick={onTestProactive}>
+                {proactiveBusy ? "正在想说什么…" : "现在发一条试试"}
+              </button>
+            </div>
+            {proactiveReason.length > 0 && <p className="settings-note">上次判断：{proactiveReason}</p>}
           </section>
 
           <section className="settings-section" aria-labelledby="settings-usage">

@@ -16,14 +16,28 @@ use crate::store;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LlmConfig {
+    #[serde(default = "default_provider")]
+    pub provider: String,
     #[serde(default = "default_base_url")]
     pub base_url: String,
     #[serde(default = "default_model")]
     pub model: String,
     #[serde(default)]
+    pub fast_model: String,
+    #[serde(default)]
     pub api_key: String,
+    #[serde(default)]
+    pub fallback_base_url: String,
+    #[serde(default)]
+    pub fallback_model: String,
+    #[serde(default)]
+    pub fallback_api_key: String,
     #[serde(default = "default_temperature")]
     pub temperature: f32,
+}
+
+fn default_provider() -> String {
+    "deepseek".to_string()
 }
 
 fn default_base_url() -> String {
@@ -41,9 +55,14 @@ fn default_temperature() -> f32 {
 impl Default for LlmConfig {
     fn default() -> Self {
         Self {
+            provider: default_provider(),
             base_url: default_base_url(),
             model: default_model(),
+            fast_model: String::new(),
             api_key: String::new(),
+            fallback_base_url: String::new(),
+            fallback_model: String::new(),
+            fallback_api_key: String::new(),
             temperature: default_temperature(),
         }
     }
@@ -154,23 +173,44 @@ async fn stream_chat<F: FnMut(ChatEvent)>(
         .timeout(Duration::from_secs(180))
         .build()
         .map_err(|e| e.to_string())?;
-    let mut request = client
-        .post(endpoint(&config.base_url))
-        .header("Content-Type", "application/json")
-        .header("Accept", "text/event-stream");
-    if !config.api_key.trim().is_empty() {
-        request = request.bearer_auth(config.api_key.trim());
-    }
-
-    let response = match request.body(body.to_string()).send().await {
-        Ok(response) => response,
-        Err(error) => {
-            let _ = on_event(ChatEvent {
-                kind: "error".to_string(),
-                text: format!("连接模型失败：{error}"),
-            });
-            return Ok(());
+    let body_string = body.to_string();
+    let mut response = None;
+    let mut last_error = String::new();
+    for attempt in 0..2 {
+        let mut request = client
+            .post(endpoint(&config.base_url))
+            .header("Content-Type", "application/json")
+            .header("Accept", "text/event-stream");
+        if !config.api_key.trim().is_empty() {
+            request = request.bearer_auth(config.api_key.trim());
         }
+        match request.body(body_string.clone()).send().await {
+            Ok(candidate) => {
+                if attempt == 0
+                    && (candidate.status().as_u16() == 429 || candidate.status().is_server_error())
+                {
+                    last_error = format!("模型暂时不可用（{}），正在重试…", candidate.status());
+                    tokio::time::sleep(Duration::from_millis(700)).await;
+                    continue;
+                }
+                response = Some(candidate);
+                break;
+            }
+            Err(error) => {
+                last_error = error.to_string();
+                if attempt == 0 {
+                    tokio::time::sleep(Duration::from_millis(700)).await;
+                    continue;
+                }
+            }
+        }
+    }
+    let Some(response) = response else {
+        let _ = on_event(ChatEvent {
+            kind: "error".to_string(),
+            text: format!("连接模型失败：{last_error}"),
+        });
+        return Ok(());
     };
 
     let status = response.status();
@@ -229,6 +269,41 @@ async fn stream_chat<F: FnMut(ChatEvent)>(
         });
     }
     Ok(())
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LlmTestResult {
+    pub ok: bool,
+    pub text: String,
+    pub error: String,
+}
+
+#[tauri::command]
+pub async fn llm_test(app: tauri::AppHandle) -> Result<LlmTestResult, String> {
+    let config = load_config(&app)?;
+    let mut text = String::new();
+    let mut error = String::new();
+    stream_chat(
+        &config,
+        vec![ChatMessage {
+            role: "user".to_string(),
+            content: "只回复两个字：在的".to_string(),
+        }],
+        |event| {
+            if event.kind == "delta" {
+                text.push_str(&event.text);
+            } else if event.kind == "error" {
+                error = event.text;
+            }
+        },
+    )
+    .await?;
+    Ok(LlmTestResult {
+        ok: error.is_empty() && !text.trim().is_empty(),
+        text,
+        error,
+    })
 }
 
 #[tauri::command]
@@ -306,6 +381,7 @@ mod tests {
             model: "mock".to_string(),
             api_key: String::new(),
             temperature: 0.5,
+            ..LlmConfig::default()
         };
         let mut events = Vec::new();
         stream_chat(

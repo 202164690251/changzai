@@ -84,6 +84,7 @@ pub fn run() {
             store::memory_count,
             llm::llm_config_load,
             llm::llm_config_save,
+            llm::llm_test,
             llm::llm_chat_stream
         ])
         .setup(|app| {

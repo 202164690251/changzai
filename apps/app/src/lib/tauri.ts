@@ -150,10 +150,18 @@ export interface MediaPersistResult {
 /* ───────────────── Step 3：模型 / 人格 / 流式对话 ───────────────── */
 
 export interface LlmConfig {
+  provider: string;
   baseUrl: string;
   model: string;
+  fastModel: string;
   apiKey: string;
   temperature: number;
+}
+
+export interface LlmTestResult {
+  ok: boolean;
+  text: string;
+  error: string;
 }
 
 export type ChatRole = "system" | "user" | "assistant";
@@ -288,6 +296,10 @@ export const api = {
   async llmConfigSave(config: LlmConfig): Promise<boolean> {
     requireTauri();
     return invoke<boolean>("llm_config_save", { config });
+  },
+  async llmTest(): Promise<LlmTestResult> {
+    requireTauri();
+    return invoke<LlmTestResult>("llm_test");
   },
   /** Step 3：人格卡持久化 */
   async personaSave(persona: unknown): Promise<boolean> {
