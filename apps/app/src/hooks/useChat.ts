@@ -10,6 +10,8 @@ import {
   determineScene,
   detectOpenLoops,
   filterAiFlavor,
+  qualityIssues,
+  softenWeirdText,
   guardUserMessage,
   planArc,
   recallLast,
@@ -301,7 +303,9 @@ export function useChat(options: ChatOptions): ChatApi {
       const replyId = nextId();
       let started = false;
       const finalize = (full: string): void => {
-        const filtered = filterAiFlavor(full).text;
+        const candidate = filterAiFlavor(full).text;
+        const softened = softenWeirdText(candidate);
+        const filtered = qualityIssues(softened).length > 0 ? "" : softened;
         const segments = splitSegments(filtered);
         if (segments.length === 0) return;
         const first = segments[0]!;

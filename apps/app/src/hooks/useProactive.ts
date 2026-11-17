@@ -6,6 +6,8 @@ import {
   applyProactivePreset,
   buildSystemPrompt,
   filterAiFlavor,
+  qualityIssues,
+  softenWeirdText,
   planProactive,
   recordProactiveSent,
   type PersonaProfile,
@@ -27,6 +29,7 @@ export interface ProactiveOptions {
   relationship?: RelationshipProfile | null;
   styleCalibration?: string;
   moodNote?: string;
+  recentMessages?: Array<{ from: "her" | "me"; text: string }>;
   lastUserAt: number;
   onMessage: (text: string) => void;
   onNotice: (text: string) => void;
@@ -88,7 +91,9 @@ export function useProactive(options: ProactiveOptions): ProactiveApi {
         if (typeof parsed.checkIntervalSeconds !== "number" && typeof parsed.checkIntervalMinutes === "number") {
           migrated.checkIntervalSeconds = Math.max(3, Math.round(parsed.checkIntervalMinutes * 60));
         }
-        setState({ ...DEFAULT_PROACTIVE_STATE, ...migrated });
+        const next = { ...DEFAULT_PROACTIVE_STATE, ...migrated };
+        if (!["low", "medium", "high", "custom"].includes(next.desireLevel)) next.desireLevel = "medium";
+        setState(next);
       } catch {
         /* 默认关闭 */
       }
@@ -145,7 +150,7 @@ export function useProactive(options: ProactiveOptions): ProactiveApi {
 
   const generate = useCallback(async (): Promise<void> => {
     if (busyRef.current) return;
-    const { persona, llm, herName, meName, relationship, styleCalibration, moodNote, onMessage, onNotice } = optionsRef.current;
+    const { persona, llm, herName, meName, relationship, styleCalibration, moodNote, recentMessages, onMessage, onNotice } = optionsRef.current;
     if (!persona || !llmReady(llm)) {
       onNotice("主动消息需要人格卡和模型配置");
       return;
@@ -153,10 +158,21 @@ export function useProactive(options: ProactiveOptions): ProactiveApi {
     busyRef.current = true;
     setBusy(true);
     try {
-      const system = `${buildSystemPrompt(persona, { name: herName, selfName: meName })}
+      const recent = (recentMessages ?? []).filter((message) => message.text.trim().length > 0).slice(-8);
+      const transcript = recent.map((message) => `${message.from === "her" ? "ta" : "我"}：${message.text.slice(0, 100)}`).join("\n");
+      const herRecent = recent.filter((message) => message.from === "her").slice(-3).map((message) => message.text.slice(0, 40));
+      const system = `${buildSystemPrompt(persona, { name: herName, selfName: meName, relationship: relationship ?? undefined, styleCalibration, moodNote })}
+
+【你们刚才在聊】
+${transcript || "（还没有最近的对话）"}
 
 【主动消息】
-现在没有新消息。请主动发一条很短的消息（1–2 句），像突然想起对方；不要解释为什么发，不要问“在吗”，不要重复上次的话。只输出消息本身。`;
+现在没有新消息。请只接着上面最近的一个具体话题，主动发一条很短的消息（1–2 句），像突然想起对方。
+要求：
+- 不要突然换话题，不要问“在吗”；
+- 不要用“还是那句话”“那个”“来着”这类没有明确指代的半句；
+- 不要重复最近说过的话：${herRecent.length > 0 ? herRecent.join(" / ") : "（无）"}；
+- 如果最近没有可接的话，就发一句具体的日常关心，不要装神弄鬼。只输出消息本身。`;
       let full = "";
       let error = "";
       await api.llmChatStream(
@@ -173,8 +189,8 @@ export function useProactive(options: ProactiveOptions): ProactiveApi {
         onNotice(error || "主动消息没有生成成功");
         return;
       }
-      const text = filterAiFlavor(full).text;
-      if (!text) return;
+      const text = softenWeirdText(filterAiFlavor(full).text);
+      if (!text || qualityIssues(text).length > 0) return;
       onMessage(text);
       void notify(herName, text);
       const now = Date.now();
