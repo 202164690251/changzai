@@ -52,15 +52,36 @@ jobs:
       - name: Ensure OpenSSL (sqlcipher-system)
         shell: pwsh
         run: |
-          $candidates = @('C:\Program Files\OpenSSL-Win64', 'C:\Program Files\OpenSSL-Win32')
-          $dir = $candidates | Where-Object { Test-Path (Join-Path $_ 'include\openssl\ssl.h') } | Select-Object -First 1
+          function Find-OpenSSL {
+            $roots = @(
+              'C:\Program Files\OpenSSL-Win64',
+              'C:\Program Files\OpenSSL-Win32',
+              'C:\Program Files\OpenSSL'
+            )
+            foreach ($root in $roots) {
+              if (-not (Test-Path $root)) { continue }
+              if (Test-Path (Join-Path $root 'include\openssl\ssl.h')) { return $root }
+              $hit = Get-ChildItem $root -Recurse -Filter 'ssl.h' -ErrorAction SilentlyContinue |
+                Where-Object { $_.DirectoryName -like '*\include\openssl' } |
+                Select-Object -First 1
+              if ($hit) {
+                $includeDir = Split-Path $hit.DirectoryName -Parent   # ...\include
+                return (Split-Path $includeDir -Parent)               # <root>
+              }
+            }
+            return $null
+          }
+
+          $dir = Find-OpenSSL
           if (-not $dir) {
             choco install openssl -y --no-progress
-            $dir = $candidates | Where-Object { Test-Path (Join-Path $_ 'include\openssl\ssl.h') } | Select-Object -First 1
+            $env:Path = 'C:\Program Files\OpenSSL\bin;' + $env:Path
+            $dir = Find-OpenSSL
           }
           if (-not $dir) { throw 'OpenSSL not found after install' }
           "OPENSSL_DIR=$dir" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-          Join-Path $dir 'bin' | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+          $bin = Join-Path $dir 'bin'
+          if (Test-Path $bin) { $bin | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8 }
           Write-Host "OpenSSL: $dir"
       - uses: Swatinem/rust-cache@v2
         with:
