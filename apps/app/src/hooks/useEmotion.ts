@@ -40,6 +40,7 @@ export interface EmotionApi {
   update: (state: EmotionState) => void;
   setOverride: (state: EmotionState, note: string, until: number | null) => void;
   clearOverride: () => void;
+  replace: (state: EmotionState, override: MoodOverride | null) => void;
 }
 
 export function useEmotion(): EmotionApi {
@@ -84,6 +85,15 @@ export function useEmotion(): EmotionApi {
     }
   }, []);
 
+  const replace = useCallback((next: EmotionState, nextOverride: MoodOverride | null) => {
+    setState(next);
+    setOverrideState(nextOverride);
+    if (isTauri()) {
+      void api.settingSet(SETTING_KEY, JSON.stringify(next)).catch(() => undefined);
+      void api.settingSet(OVERRIDE_KEY, JSON.stringify(nextOverride)).catch(() => undefined);
+    }
+  }, []);
+
   const setOverride = useCallback((next: EmotionState, note: string, until: number | null) => {
     const value: MoodOverride = { state: next, note, until, updatedAt: Date.now() };
     setOverrideState(value);
@@ -113,5 +123,6 @@ export function useEmotion(): EmotionApi {
     update,
     setOverride,
     clearOverride,
+    replace,
   };
 }

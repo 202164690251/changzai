@@ -18,6 +18,7 @@ export interface LlmApi {
   saving: boolean;
   message: string | null;
   save: (config: LlmConfig) => Promise<boolean>;
+  replace: (config: LlmConfig) => void;
 }
 
 export function useLlmConfig(): LlmApi {
@@ -44,6 +45,11 @@ export function useLlmConfig(): LlmApi {
     };
   }, []);
 
+  const replace = useCallback((next: LlmConfig) => {
+    setConfig(next);
+    if (isTauri()) void api.llmConfigSave(next).catch(() => undefined);
+  }, []);
+
   const save = useCallback(async (next: LlmConfig): Promise<boolean> => {
     setSaving(true);
     setMessage(null);
@@ -62,5 +68,5 @@ export function useLlmConfig(): LlmApi {
     }
   }, []);
 
-  return { config, ready, saving, message, save };
+  return { config, ready, saving, message, save, replace };
 }
