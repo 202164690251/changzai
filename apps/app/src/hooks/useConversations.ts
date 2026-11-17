@@ -1,10 +1,20 @@
 // 多会话：每个聊天有独立人格/关系/标题；消息按 payload.convId 归档
 import { useCallback, useEffect, useState } from "react";
-import type { PersonaProfile, RelationshipProfile } from "@changzai/core";
+import type { EmotionState, MoodOverride, PersonaProfile, ProactiveState, RelationshipProfile, StyleFeedback } from "@changzai/core";
+import type { LlmConfig } from "../lib/tauri.ts";
 import { api, isTauri } from "../lib/tauri.ts";
 
 const STORE_KEY = "conversations.v1";
 const ACTIVE_KEY = "conversations.active";
+
+export interface ConversationSettings {
+  llm: LlmConfig;
+  proactive: ProactiveState;
+  emotion: EmotionState;
+  emotionOverride: MoodOverride | null;
+  styleReviewEnabled: boolean;
+  styleFeedback: StyleFeedback[];
+}
 
 export interface ConversationRecord {
   id: string;
@@ -13,6 +23,8 @@ export interface ConversationRecord {
   herAvatar: string | null;
   persona: PersonaProfile;
   relationship: RelationshipProfile;
+  /** 每个聊天独立：模型/主动消息/情绪/风格校准 */
+  settings?: ConversationSettings;
   greeting: string;
   lastPreview?: string;
   lastMessageAt?: number;

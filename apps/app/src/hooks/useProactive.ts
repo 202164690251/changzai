@@ -37,11 +37,13 @@ export interface ProactiveOptions {
 
 export interface ProactiveApi {
   state: ProactiveState;
+  ready: boolean;
   busy: boolean;
   planReason: string;
   setEnabled: (enabled: boolean) => void;
   setDesire: (level: ProactiveDesire) => void;
   updateSettings: (patch: Partial<ProactiveState>) => void;
+  replace: (state: ProactiveState) => void;
   setPaused: (minutes: number | null) => void;
   test: () => Promise<void>;
 }
@@ -65,6 +67,7 @@ async function notify(title: string, body: string): Promise<void> {
 export function useProactive(options: ProactiveOptions): ProactiveApi {
   const [state, setState] = useState<ProactiveState>(DEFAULT_PROACTIVE_STATE);
   const [busy, setBusy] = useState(false);
+  const [ready, setReady] = useState(!isTauri());
   const [planReason, setPlanReason] = useState("");
   const stateRef = useRef(state);
   const busyRef = useRef(false);
@@ -96,6 +99,8 @@ export function useProactive(options: ProactiveOptions): ProactiveApi {
         setState(next);
       } catch {
         /* 默认关闭 */
+      } finally {
+        if (alive) setReady(true);
       }
     })();
     return () => {
@@ -123,6 +128,10 @@ export function useProactive(options: ProactiveOptions): ProactiveApi {
     },
     [persist],
   );
+
+  const replace = useCallback((next: ProactiveState) => {
+    persist(next);
+  }, [persist]);
 
   const updateSettings = useCallback(
     (patch: Partial<ProactiveState>) => {
@@ -223,5 +232,5 @@ ${transcript || "（还没有最近的对话）"}
     return () => window.clearInterval(timer);
   }, [generate, state.checkIntervalSeconds, state.enabled]);
 
-  return { state, busy, planReason, setEnabled, setDesire, updateSettings, setPaused, test };
+  return { state, ready, busy, planReason, setEnabled, setDesire, updateSettings, setPaused, replace, test };
 }

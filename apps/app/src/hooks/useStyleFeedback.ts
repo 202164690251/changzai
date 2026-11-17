@@ -23,16 +23,19 @@ function parseFeedback(raw: string | null): StyleFeedback[] {
 
 export interface StyleFeedbackApi {
   enabled: boolean;
+  ready: boolean;
   feedback: StyleFeedback[];
   calibration: string;
   setEnabled: (enabled: boolean) => void;
   add: (input: { messageId: string; text: string; rating: number; tags: string[]; correctedText?: string }) => void;
   clear: () => void;
+  replace: (enabled: boolean, feedback: StyleFeedback[]) => void;
 }
 
 export function useStyleFeedback(): StyleFeedbackApi {
   const [enabled, setEnabledState] = useState(false);
   const [feedback, setFeedback] = useState<StyleFeedback[]>([]);
+  const [ready, setReady] = useState(!isTauri());
 
   useEffect(() => {
     if (!isTauri()) return;
@@ -48,6 +51,8 @@ export function useStyleFeedback(): StyleFeedbackApi {
         setFeedback(parseFeedback(feedbackRaw).slice(-200));
       } catch {
         /* 默认关闭 */
+      } finally {
+        if (alive) setReady(true);
       }
     })();
     return () => {
@@ -66,6 +71,15 @@ export function useStyleFeedback(): StyleFeedbackApi {
     setEnabledState(value);
     if (isTauri()) {
       void api.settingSet(ENABLED_KEY, value ? "1" : "0").catch(() => undefined);
+    }
+  }, []);
+
+  const replace = useCallback((nextEnabled: boolean, nextFeedback: StyleFeedback[]) => {
+    setEnabledState(nextEnabled);
+    setFeedback(nextFeedback.slice(-200));
+    if (isTauri()) {
+      void api.settingSet(ENABLED_KEY, nextEnabled ? "1" : "0").catch(() => undefined);
+      void api.settingSet(FEEDBACK_KEY, JSON.stringify(nextFeedback.slice(-200))).catch(() => undefined);
     }
   }, []);
 
@@ -89,5 +103,5 @@ export function useStyleFeedback(): StyleFeedbackApi {
 
   const calibration = useMemo(() => styleCalibrationText(feedback), [feedback]);
 
-  return { enabled, feedback, calibration, setEnabled, add, clear };
+  return { enabled, ready, feedback, calibration, setEnabled, add, clear, replace };
 }

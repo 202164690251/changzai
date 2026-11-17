@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactElement } from "react";
-import { buildCustomPersona, buildCustomRelationship, buildPresetPersona, buildPresetRelationship, type CustomPersonaForm, type PersonaPreset, type PersonaProfile, type RelationshipProfile } from "@changzai/core";
+import { DEFAULT_EMOTION, DEFAULT_PROACTIVE_STATE, buildCustomPersona, buildCustomRelationship, buildPresetPersona, buildPresetRelationship, type CustomPersonaForm, type PersonaPreset, type PersonaProfile, type RelationshipProfile } from "@changzai/core";
 import { useChat, lastMessageOf, messagePreview, type ChatMsg } from "../hooks/useChat.ts";
 import { useAnalytics } from "../hooks/useAnalytics.ts";
 import { useDatabase } from "../hooks/useDatabase.ts";
@@ -14,7 +14,7 @@ import { useOnboarding } from "../hooks/useOnboarding.ts";
 import { usePin } from "../hooks/usePin.ts";
 import { usePersona } from "../hooks/usePersona.ts";
 import { useProactive } from "../hooks/useProactive.ts";
-import { useConversations, type ConversationRecord } from "../hooks/useConversations.ts";
+import { useConversations, type ConversationRecord, type ConversationSettings } from "../hooks/useConversations.ts";
 import { useProfile } from "../hooks/useProfile.ts";
 import { useToast } from "../hooks/useToast.ts";
 import { readChatImageFile } from "../lib/avatar.ts";
@@ -108,6 +108,7 @@ export function ChatShell(): ReactElement {
   const [insertDraft, setInsertDraft] = useState<{ id: number; text: string } | null>(null);
   const night = new Date().getHours() >= 23 || new Date().getHours() < 7;
   const suppressConversationSync = useRef(false);
+  const settingsRef = useRef<ConversationSettings | null>(null);
   const defaultConversationChecked = useRef(false);
   const loadedConversationRef = useRef<string | null>(null);
   const [convMenu, setConvMenu] = useState<{ record: ConversationRecord; x: number; y: number } | null>(null);
@@ -128,6 +129,14 @@ export function ChatShell(): ReactElement {
     ): Promise<void> => {
       const now = Date.now();
       const id = `conv-${now.toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+      const defaultSettings: ConversationSettings = settingsRef.current ?? {
+        llm: llm.config,
+        proactive: DEFAULT_PROACTIVE_STATE,
+        emotion: DEFAULT_EMOTION,
+        emotionOverride: null,
+        styleReviewEnabled: false,
+        styleFeedback: [],
+      };
       const record: ConversationRecord = {
         id,
         title,
@@ -136,6 +145,7 @@ export function ChatShell(): ReactElement {
         persona: profile,
         relationship: relation,
         greeting,
+        settings: defaultSettings,
         lastPreview: greeting,
         lastMessageAt: now,
         createdAt: now,
@@ -187,6 +197,14 @@ export function ChatShell(): ReactElement {
         persona: persona.profile,
         relationship: relationship.profile ?? fallbackRelationship(meName),
         greeting: "",
+        settings: {
+          llm: llm.config,
+          proactive: DEFAULT_PROACTIVE_STATE,
+          emotion: DEFAULT_EMOTION,
+          emotionOverride: null,
+          styleReviewEnabled: false,
+          styleFeedback: [],
+        },
         createdAt: now,
         updatedAt: now,
       };
@@ -322,6 +340,14 @@ export function ChatShell(): ReactElement {
         persona: importedProfile,
         relationship: relation,
         greeting: "",
+        settings: settingsRef.current ?? {
+          llm: llm.config,
+          proactive: DEFAULT_PROACTIVE_STATE,
+          emotion: DEFAULT_EMOTION,
+          emotionOverride: null,
+          styleReviewEnabled: false,
+          styleFeedback: [],
+        },
         lastPreview: "还没有开始",
         createdAt: now,
         updatedAt: now,
@@ -571,6 +597,46 @@ export function ChatShell(): ReactElement {
     },
     onNotice: show,
   });
+
+  // 切换/启动时加载该聊天自己的模型、主动消息、情绪、风格反馈
+  useEffect(() => {
+    if (!activeConversation) return;
+    if (loadedConversationRef.current === activeConversation.id) return;
+    loadedConversationRef.current = activeConversation.id;
+    persona.replace(activeConversation.persona);
+    relationship.replace(activeConversation.relationship);
+    const settings = activeConversation.settings;
+    if (settings) {
+      llm.replace(settings.llm);
+      proactive.replace(settings.proactive);
+      emotion.replace(settings.emotion, settings.emotionOverride);
+      styleFeedback.replace(settings.styleReviewEnabled, settings.styleFeedback);
+    }
+  }, [activeConversation, emotion, llm, persona, proactive, relationship, styleFeedback]);
+
+  // 当前聊天的设置变化写回会话记录
+  useEffect(() => {
+    if (suppressConversationSync.current || !activeConversation) return;
+    const settings: ConversationSettings = {
+      llm: llm.config,
+      proactive: proactive.state,
+      emotion: emotion.state,
+      emotionOverride: emotion.override,
+      styleReviewEnabled: styleFeedback.enabled,
+      styleFeedback: styleFeedback.feedback,
+    };
+    settingsRef.current = settings;
+    conversations.update(activeConversation.id, { settings });
+  }, [
+    activeConversation?.id,
+    conversations.update,
+    emotion.override,
+    emotion.state,
+    llm.config,
+    proactive.state,
+    styleFeedback.enabled,
+    styleFeedback.feedback,
+  ]);
 
   const handlePickImage = useCallback(
     (file: File) => {

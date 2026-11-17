@@ -55,7 +55,19 @@
   - 若还有其它聊天，自动切到第一个；
   - 若没有，回到空状态，可用 `+` 新建。
 
-## 文件
+'## 6. 每个聊天的独立设置
+
+- 会话记录增加 `settings`：
+  - 模型配置（provider/baseUrl/model/fastModel/apiKey/temperature）；
+  - 主动消息状态/预算/免打扰/秒级频率；
+  - 情绪状态与手动状态覆盖；
+  - 风格校准开关与反馈列表。
+- 切换聊天时保存当前聊天设置，加载目标聊天设置；
+- 当前聊天改动通过同步 effect 写回 `conversations.v1`；
+- 人格、关系、消息、标题/头像本来就是每聊天独立；
+- 安全/备份/全局统计仍是全局设置。
+
+## 文件'
 
 - `apps/app/src/hooks/useConversations.ts`
 - `apps/app/src/components/ConversationList.tsx`
