@@ -1,11 +1,18 @@
 // Step 3 · 人格卡 → system prompt / OpenAI messages（纯函数）
 import type { PersonaProfile } from "./types.ts";
+import { relationshipPromptText, type RelationshipProfile } from "./relationship.ts";
 
 export interface PersonaPromptOptions {
   /** 她的显示名；默认「ta」 */
   name?: string;
   /** 我的显示名；默认「我」 */
   selfName?: string;
+  /** 关系卡：她怎么称呼用户、你们是什么关系、用户事实 */
+  relationship?: RelationshipProfile;
+  /** 用户按需评价后生成的风格校准说明 */
+  styleCalibration?: string;
+  /** 用户手动设置的 ta 当前状态备注 */
+  moodNote?: string;
 }
 
 export interface ChatHistoryItem {
@@ -49,6 +56,9 @@ export function buildSystemPrompt(persona: PersonaProfile, options: PersonaPromp
     `- 除非用户问起，不要主动解释自己是 AI；被问到时用 ${name} 的口吻轻轻承认，并继续聊天。`,
     `- 不要声称自己记得聊天记录之外的现实事件；人格卡里的事实才可以用。`,
     "",
+    ...(options.relationship ? [relationshipPromptText(options.relationship), ""] : []),
+    ...(options.styleCalibration?.trim() ? [options.styleCalibration.trim(), ""] : []),
+    ...(options.moodNote?.trim() ? ["【ta 现在的状态】", `- ${options.moodNote.trim()}`, ""] : []),
     "【说话风格】",
     ...styleLines(persona).map((line) => `- ${line}`),
     `- 整体印象：${persona.summary}`,

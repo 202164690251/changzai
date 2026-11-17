@@ -21,8 +21,8 @@
 
 ## 验证数字
 
-- core：**57 项**（新增 eval 3 项）
-- Rust：**11 项**（备份含媒体/PIN/销毁）
+- core：**66 项**（新增 eval 3 项 + 关系/状态/校准 5 项 + 适配器 3 项）
+- Rust：**12 项**（备份含媒体/PIN/销毁/聊天持久化）
 - `tsc --noEmit` 0 错误；`vite build` 成功
 - `scripts\verify.ps1` 全部通过 ✅
 - `pnpm eval`：20/20 mock 通过（见 `docs/eval-report.md`）

@@ -4,6 +4,8 @@ import { useChat, lastMessageOf, messagePreview, type ChatMsg } from "../hooks/u
 import { useAnalytics } from "../hooks/useAnalytics.ts";
 import { useDatabase } from "../hooks/useDatabase.ts";
 import { useEmotion } from "../hooks/useEmotion.ts";
+import { useRelationship } from "../hooks/useRelationship.ts";
+import { useStyleFeedback } from "../hooks/useStyleFeedback.ts";
 import { useImport } from "../hooks/useImport.ts";
 import { useLlmConfig } from "../hooks/useLlmConfig.ts";
 import { useMediaImport } from "../hooks/useMediaImport.ts";
@@ -27,6 +29,8 @@ import { MessageList } from "./MessageList.tsx";
 import { NavRail, type RailTab } from "./NavRail.tsx";
 import { Onboarding } from "./Onboarding.tsx";
 import { MemoryModal } from "./MemoryModal.tsx";
+import { MoodPanel } from "./MoodPanel.tsx";
+import { StyleReviewModal } from "./StyleReviewModal.tsx";
 import { LockScreen } from "./LockScreen.tsx";
 import { SettingsDrawer } from "./SettingsDrawer.tsx";
 import { SidePanel } from "./SidePanel.tsx";
@@ -43,13 +47,21 @@ export function ChatShell(): ReactElement {
   const pin = usePin();
   const { profile, storageError, setName, setAvatar, reset } = useProfile(db.ready);
   const { toast, show } = useToast();
+  const herName = displayName(profile.her, "ta");
+  const meName = displayName(profile.me, "我");
+  const relationship = useRelationship(herName, meName, db.ready);
+  const styleFeedback = useStyleFeedback();
   const { messages, typing, unread, sendText, sendImage, appendImported, appendProactive, recallLastMessage, deleteMessage, clear, markRead } = useChat({
     persona: persona.profile,
     llm: llm.config,
-    herName: displayName(profile.her, "ta"),
-    meName: displayName(profile.me, "我"),
-    emotion: emotion.state,
+    herName,
+    meName,
+    emotion: emotion.effective,
     onEmotion: emotion.update,
+    dbReady: db.ready,
+    relationship: relationship.profile,
+    styleCalibration: styleFeedback.calibration,
+    moodNote: emotion.moodNote,
     onNotice: show,
   });
 
@@ -65,12 +77,15 @@ export function ChatShell(): ReactElement {
   const [safetyMessage, setSafetyMessage] = useState<string | null>(null);
   const [messageMenu, setMessageMenu] = useState<{ message: ChatMsg; x: number; y: number } | null>(null);
   const [reminder, setReminder] = useState(false);
+  const [moodOpen, setMoodOpen] = useState(false);
+  const [styleReview, setStyleReview] = useState<{ id: string; text: string } | null>(null);
   const [memoryOpen, setMemoryOpen] = useState(false);
   const [insertDraft, setInsertDraft] = useState<{ id: number; text: string } | null>(null);
   const night = new Date().getHours() >= 23 || new Date().getHours() < 7;
   const importer = useImport(async (result) => {
     await db.refresh();
     await persona.buildFromImport(result.messages);
+    if (!relationship.profile) void relationship.rebuild();
     void api.memoryRebuild().catch(() => undefined);
     analytics.log("import_done");
     show("人格卡已生成，可以在设置里查看");
@@ -295,6 +310,7 @@ export function ChatShell(): ReactElement {
           onOpenSettings={() => setSettingsOpen(true)}
           onRecall={recallLastMessage}
           onMemory={() => setMemoryOpen(true)}
+          onMood={() => setMoodOpen(true)}
         />
         {reminder && (
           <div className="safety-banner">
@@ -354,7 +370,21 @@ export function ChatShell(): ReactElement {
           onRebuildPersona={() => {
             void persona.rebuildFromDb();
           }}
-          emotion={emotion.state}
+          emotion={emotion.effective}
+          relationship={relationship.profile}
+          relationshipBusy={relationship.busy}
+          relationshipMessage={relationship.message}
+          onSaveRelationship={(next) => {
+            void relationship.save(next);
+          }}
+          onRebuildRelationship={() => {
+            void relationship.rebuild();
+          }}
+          styleReviewEnabled={styleFeedback.enabled}
+          styleFeedbackCount={styleFeedback.feedback.length}
+          onToggleStyleReview={styleFeedback.setEnabled}
+          onClearStyleFeedback={styleFeedback.clear}
+          onOpenMood={() => setMoodOpen(true)}
           analyticsCounts={analytics.counts}
           analyticsTotal={analytics.total}
           onClearAnalytics={analytics.clear}
@@ -364,6 +394,7 @@ export function ChatShell(): ReactElement {
           onToggleProactive={proactive.setEnabled}
           onSetProactiveDesire={proactive.setDesire}
           onUpdateProactive={proactive.updateSettings}
+          onPauseProactive={proactive.setPaused}
           onTestProactive={() => {
             void proactive.test();
           }}
@@ -389,6 +420,9 @@ export function ChatShell(): ReactElement {
           personaHistoryCount={persona.historyCount}
           onUpdateFacts={(facts) => {
             void persona.updateFacts(facts);
+          }}
+          onUpdatePersona={(patch) => {
+            void persona.updateProfile(patch);
           }}
           onRollbackPersona={() => {
             void persona.rollback();
@@ -487,6 +521,20 @@ export function ChatShell(): ReactElement {
                 撤回
               </button>
             )}
+            {styleFeedback.enabled && messageMenu.message.from === "her" && messageMenu.message.kind === "text" && (
+              <button
+                type="button"
+                onClick={() => {
+                  setStyleReview({
+                    id: messageMenu.message.id,
+                    text: messageMenu.message.kind === "text" ? messageMenu.message.text : "",
+                  });
+                  setMessageMenu(null);
+                }}
+              >
+                风格校准
+              </button>
+            )}
             <button
               type="button"
               onClick={() => {
@@ -505,6 +553,26 @@ export function ChatShell(): ReactElement {
         samples={persona.profile?.samples ?? []}
         onClose={() => setMemoryOpen(false)}
       />
+
+      <MoodPanel
+        open={moodOpen}
+        current={emotion.effective}
+        note={emotion.moodNote}
+        onSave={(state, note, until) => emotion.setOverride(state, note, until)}
+        onClear={emotion.clearOverride}
+        onClose={() => setMoodOpen(false)}
+      />
+
+      {styleReview && (
+        <StyleReviewModal
+          text={styleReview.text}
+          onSave={(rating, tags, corrected) => {
+            styleFeedback.add({ messageId: styleReview.id, text: styleReview.text, rating, tags, correctedText: corrected });
+            show("已记录，下一轮会参考");
+          }}
+          onClose={() => setStyleReview(null)}
+        />
+      )}
 
       <ImageLightbox image={preview} onClose={() => setPreview(null)} />
       <Toast text={toast?.text ?? null} />

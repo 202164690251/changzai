@@ -1793,3 +1793,46 @@ textarea:focus-visible {
     grid-template-columns: 1fr;
   }
 }
+/* Step 7：关系卡 / ta 状态 / 风格校准 */
+.mood-modal,
+.style-review-modal {
+  width: min(560px, 92vw);
+}
+.mood-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.mood-presets .btn {
+  min-width: 64px;
+}
+.style-review-quote {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-left: 3px solid var(--green);
+  background: var(--panel-bg);
+  color: var(--text-2);
+  font-size: 14px;
+  line-height: 1.7;
+}
+.style-rating {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.style-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin: 10px 0 14px;
+  font-size: 13px;
+}
+.style-tags .settings-check {
+  margin: 0;
+}
+.mood-modal input[type="range"] {
+  width: 100%;
+  accent-color: var(--green);
+}

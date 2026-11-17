@@ -1,32 +1,27 @@
-// Step 5/6 · 主动消息（T38）：用户可调参数 + 三档欲望
+// Step 5/6 · 主动消息：三档欲望 + 可关闭免打扰 + 秒级频率
 //
-// 欲望 × 机会 → 是否发；所有预算/免打扰/空闲/检查频率都可配置。
-// 真正的托盘定时器由宿主负责；本模块只做纯逻辑决策。
+// 设计目标：用户不需要理解“欲望 × 机会”的公式；选一个档位，或者全部自定义。
+// dailyLimit / weeklyLimit = 0 表示无上限；minIdleSeconds / checkIntervalSeconds 均为秒。
 
 export type ProactiveDesire = "low" | "medium" | "high" | "custom";
 
 export interface ProactiveState {
   enabled: boolean;
-  /** 三档欲望 + 自定义 */
   desireLevel: ProactiveDesire;
-  /** 欲望系数：高欲望更容易达到阈值 */
   desireFactor: number;
-  /** 免打扰开始/结束小时（支持跨午夜，如 23 → 8；start=end 表示关闭） */
+  dndEnabled: boolean;
   dndStart: number;
   dndEnd: number;
-  /** 允许主动发送的时段（小时） */
-  activeStart: number;
-  activeEnd: number;
+  /** 0 = 无上限 */
   dailyLimit: number;
+  /** 0 = 无上限 */
   weeklyLimit: number;
-  /** 距离用户最后一条消息至少多少分钟 */
-  minIdleMinutes: number;
-  /** 前端检查间隔（分钟） */
-  checkIntervalMinutes: number;
-  /** 触发阈值 0..1；越低越容易主动 */
+  minIdleSeconds: number;
+  checkIntervalSeconds: number;
   triggerThreshold: number;
-  /** 连续多少次主动没得到回复就停 */
   noReplyLimit: number;
+  /** 手动暂停到某个时间戳；0 = 未暂停 */
+  pausedUntil: number;
   sentToday: number;
   sentWeek: number;
   lastSentAt: number;
@@ -49,12 +44,11 @@ export interface ProactivePreset {
   desireFactor: number;
   dailyLimit: number;
   weeklyLimit: number;
-  minIdleMinutes: number;
-  checkIntervalMinutes: number;
+  minIdleSeconds: number;
+  checkIntervalSeconds: number;
+  dndEnabled: boolean;
   dndStart: number;
   dndEnd: number;
-  activeStart: number;
-  activeEnd: number;
   triggerThreshold: number;
   noReplyLimit: number;
 }
@@ -63,57 +57,63 @@ export const PROACTIVE_PRESETS: Record<Exclude<ProactiveDesire, "custom">, Proac
   low: {
     id: "low",
     label: "克制",
-    description: "偶尔想起你；每天最多 1 条，夜里不打扰",
-    desireFactor: 0.6,
-    dailyLimit: 1,
-    weeklyLimit: 4,
-    minIdleMinutes: 180,
-    checkIntervalMinutes: 5,
-    dndStart: 22,
-    dndEnd: 9,
-    activeStart: 10,
-    activeEnd: 22,
-    triggerThreshold: 0.62,
+    description: "偶尔想起你；每天最多 2 条，夜里不打扰",
+    desireFactor: 0.7,
+    dailyLimit: 2,
+    weeklyLimit: 8,
+    minIdleSeconds: 120,
+    checkIntervalSeconds: 30,
+    dndEnabled: true,
+    dndStart: 23,
+    dndEnd: 8,
+    triggerThreshold: 0.6,
     noReplyLimit: 1,
   },
   medium: {
     id: "medium",
-    label: "适中",
-    description: "默认；每天最多 3 条，晚上更活跃",
+    label: "日常",
+    description: "默认；每天最多 8 条，像一个会想起你的人",
     desireFactor: 1,
-    dailyLimit: 3,
-    weeklyLimit: 12,
-    minIdleMinutes: 45,
-    checkIntervalMinutes: 2,
+    dailyLimit: 8,
+    weeklyLimit: 48,
+    minIdleSeconds: 30,
+    checkIntervalSeconds: 15,
+    dndEnabled: true,
     dndStart: 23,
     dndEnd: 8,
-    activeStart: 9,
-    activeEnd: 23,
-    triggerThreshold: 0.45,
+    triggerThreshold: 0.35,
     noReplyLimit: 2,
   },
   high: {
     id: "high",
     label: "黏人",
-    description: "更频繁；每天最多 6 条，但仍有免打扰",
-    desireFactor: 1.4,
-    dailyLimit: 6,
-    weeklyLimit: 24,
-    minIdleMinutes: 25,
-    checkIntervalMinutes: 1,
-    dndStart: 0,
+    description: "更频繁；每天最多 16 条，尽量像真人随手发消息",
+    desireFactor: 1.35,
+    dailyLimit: 16,
+    weeklyLimit: 120,
+    minIdleSeconds: 10,
+    checkIntervalSeconds: 8,
+    dndEnabled: true,
+    dndStart: 1,
     dndEnd: 7,
-    activeStart: 8,
-    activeEnd: 24,
-    triggerThreshold: 0.32,
+    triggerThreshold: 0.2,
     noReplyLimit: 3,
   },
 };
+
+function stripPreset(preset: ProactivePreset): Omit<
+  ProactiveState,
+  "enabled" | "desireLevel" | "sentToday" | "sentWeek" | "lastSentAt" | "lastUserAt" | "consecutiveNoReply" | "pausedUntil"
+> {
+  const { id: _id, label: _label, description: _description, ...values } = preset;
+  return values;
+}
 
 export const DEFAULT_PROACTIVE_STATE: ProactiveState = {
   enabled: false,
   desireLevel: "medium",
   ...stripPreset(PROACTIVE_PRESETS.medium),
+  pausedUntil: 0,
   sentToday: 0,
   sentWeek: 0,
   lastSentAt: 0,
@@ -121,22 +121,12 @@ export const DEFAULT_PROACTIVE_STATE: ProactiveState = {
   consecutiveNoReply: 0,
 };
 
-function stripPreset(preset: ProactivePreset): Omit<
-  ProactiveState,
-  "enabled" | "desireLevel" | "sentToday" | "sentWeek" | "lastSentAt" | "lastUserAt" | "consecutiveNoReply"
-> {
-  const { id: _id, label: _label, description: _description, ...values } = preset;
-  return values;
-}
-
-/** 选三档之一时，把可调参数替换成该档默认值；选「自定义」保留当前值 */
 export function applyProactivePreset(state: ProactiveState, level: ProactiveDesire): ProactiveState {
   if (level === "custom") return { ...state, desireLevel: "custom" };
-  const preset = PROACTIVE_PRESETS[level];
   return {
     ...state,
     desireLevel: level,
-    ...stripPreset(preset),
+    ...stripPreset(PROACTIVE_PRESETS[level]),
   };
 }
 
@@ -156,7 +146,6 @@ function dayStart(now: number): number {
   return date.getTime();
 }
 
-/** 把跨天/跨周的计数归零，并夹紧用户可调参数 */
 export function normalizeProactiveState(state: ProactiveState, now: number): ProactiveState {
   const day = dayStart(now);
   const sentToday = state.lastSentAt >= day ? state.sentToday : 0;
@@ -166,25 +155,21 @@ export function normalizeProactiveState(state: ProactiveState, now: number): Pro
     ...state,
     sentToday,
     sentWeek,
-    dailyLimit: Math.round(clamp(state.dailyLimit, 0, 24)),
-    weeklyLimit: Math.round(clamp(state.weeklyLimit, 0, 100)),
-    minIdleMinutes: Math.round(clamp(state.minIdleMinutes, 5, 720)),
-    checkIntervalMinutes: Math.round(clamp(state.checkIntervalMinutes, 1, 120)),
-    triggerThreshold: clamp(state.triggerThreshold, 0.05, 0.95),
-    noReplyLimit: Math.round(clamp(state.noReplyLimit, 1, 10)),
+    dailyLimit: Math.round(clamp(state.dailyLimit, 0, 200)),
+    weeklyLimit: Math.round(clamp(state.weeklyLimit, 0, 2000)),
+    minIdleSeconds: Math.round(clamp(state.minIdleSeconds, 1, 86_400)),
+    checkIntervalSeconds: Math.round(clamp(state.checkIntervalSeconds, 3, 3600)),
+    triggerThreshold: clamp(state.triggerThreshold, 0.02, 0.95),
     desireFactor: clamp(state.desireFactor, 0.1, 2),
     dndStart: Math.round(clamp(state.dndStart, 0, 23)),
     dndEnd: Math.round(clamp(state.dndEnd, 0, 23)),
-    activeStart: Math.round(clamp(state.activeStart, 0, 23)),
-    activeEnd: Math.round(clamp(state.activeEnd, 1, 24)),
+    noReplyLimit: Math.round(clamp(state.noReplyLimit, 1, 20)),
+    pausedUntil: Math.max(0, state.pausedUntil || 0),
   };
 }
 
 export interface PlanOptions {
-  /** 覆盖状态里的最小空闲分钟数（测试/临时） */
-  minIdleMinutes?: number;
-  activeStart?: number;
-  activeEnd?: number;
+  minIdleSeconds?: number;
 }
 
 export function planProactive(
@@ -193,38 +178,30 @@ export function planProactive(
   options: PlanOptions = {},
 ): ProactivePlan {
   const state = normalizeProactiveState(input, now);
-  const idleMinutes = state.lastUserAt > 0 ? (now - state.lastUserAt) / 60_000 : 999;
+  const idleSeconds = state.lastUserAt > 0 ? (now - state.lastUserAt) / 1000 : 999_999;
   const hour = new Date(now).getHours();
-  const minIdle = options.minIdleMinutes ?? state.minIdleMinutes;
-  const activeStart = options.activeStart ?? state.activeStart;
-  const activeEnd = options.activeEnd ?? state.activeEnd;
+  const minIdle = options.minIdleSeconds ?? state.minIdleSeconds;
 
-  const desire = Math.min(1, idleMinutes / Math.max(1, minIdle * 3)) * state.desireFactor;
+  const desire = Math.min(1, idleSeconds / Math.max(1, minIdle * 3)) * state.desireFactor;
   const evening = hour >= 19 && hour <= 22;
-  const opportunity = inDnd(hour, state.dndStart, state.dndEnd)
-    ? 0
-    : !(hour >= activeStart && hour < activeEnd)
-      ? 0.1
-      : evening
-        ? 1
-        : 0.6;
+  const opportunity = state.dndEnabled && inDnd(hour, state.dndStart, state.dndEnd) ? 0 : evening ? 1 : 0.55;
   const score = Math.min(1, desire * 0.65 + opportunity * 0.35);
 
   if (!state.enabled) return { shouldSend: false, reason: "主动消息未开启", desire, opportunity, score };
-  if (inDnd(hour, state.dndStart, state.dndEnd)) {
+  if (state.pausedUntil > now) {
+    return { shouldSend: false, reason: `已暂停到 ${new Date(state.pausedUntil).toLocaleString()}`, desire, opportunity, score };
+  }
+  if (state.dndEnabled && inDnd(hour, state.dndStart, state.dndEnd)) {
     return { shouldSend: false, reason: "免打扰时段", desire, opportunity, score };
   }
-  if (!(hour >= activeStart && hour < activeEnd)) {
-    return { shouldSend: false, reason: "不在活跃时段", desire, opportunity, score };
-  }
-  if (state.sentToday >= state.dailyLimit) {
+  if (state.dailyLimit > 0 && state.sentToday >= state.dailyLimit) {
     return { shouldSend: false, reason: "今天主动额度已用完", desire, opportunity, score };
   }
-  if (state.sentWeek >= state.weeklyLimit) {
+  if (state.weeklyLimit > 0 && state.sentWeek >= state.weeklyLimit) {
     return { shouldSend: false, reason: "本周主动额度已用完", desire, opportunity, score };
   }
-  if (idleMinutes < minIdle) {
-    return { shouldSend: false, reason: `刚聊过，再等等（${Math.round(idleMinutes)} 分钟）`, desire, opportunity, score };
+  if (idleSeconds < minIdle) {
+    return { shouldSend: false, reason: `刚聊过，再等 ${Math.max(1, Math.round(minIdle - idleSeconds))} 秒`, desire, opportunity, score };
   }
   if (state.consecutiveNoReply >= state.noReplyLimit) {
     return { shouldSend: false, reason: "对方连续没回，先停一停", desire, opportunity, score };
@@ -253,16 +230,11 @@ export function recordProactiveSent(state: ProactiveState, now: number): Proacti
 
 export function recordUserReply(state: ProactiveState, now: number): ProactiveState {
   return normalizeProactiveState(
-    {
-      ...state,
-      lastUserAt: now,
-      consecutiveNoReply: 0,
-    },
+    { ...state, lastUserAt: now, consecutiveNoReply: 0 },
     now,
   );
 }
 
-/** 用户已读但未回：用于降频 */
 export function recordProactiveIgnored(state: ProactiveState): ProactiveState {
   return { ...state, consecutiveNoReply: state.consecutiveNoReply + 1 };
 }

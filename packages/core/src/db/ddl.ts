@@ -222,10 +222,22 @@ CREATE TABLE IF NOT EXISTS setting (
   k TEXT PRIMARY KEY,
   v TEXT
 );
+
+-- 当前聊天会话（持久化，供重启后恢复上下文；payload 存 ChatMsg JSON）
+CREATE TABLE IF NOT EXISTS chat_message (
+  id TEXT PRIMARY KEY,
+  ts INTEGER NOT NULL,
+  payload TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_chat_ts ON chat_message(ts);
 `;
+
+
 
 export const PRAGMA_AFTER_KEY = `
 PRAGMA journal_mode = WAL;
 PRAGMA foreign_keys = ON;
 PRAGMA synchronous = NORMAL;
+
+
 `;

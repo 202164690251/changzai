@@ -1,5 +1,6 @@
 // Step 4 · 对话运行时 prompt（人格卡 + 情绪 + Arc + Governor + 四层记忆 + 事实锁）
 import type { PersonaProfile } from "../persona/types.ts";
+import type { RelationshipProfile } from "../persona/relationship.ts";
 import { buildSystemPrompt, type ChatHistoryItem, type OpenAiMessage, type PersonaPromptOptions } from "../persona/prompt.ts";
 import { describeEmotion, type EmotionState } from "../emotion/state.ts";
 import { describeArc, type ArcPlan } from "../arc/director.ts";
@@ -17,6 +18,11 @@ export interface RuntimePromptOptions {
   openLoops: OpenLoop[];
   summary?: string;
   profile?: PersonaPromptOptions;
+  relationship?: RelationshipProfile;
+  styleCalibration?: string;
+  moodNote?: string;
+  /** 当前会话主题，用于防止每轮跳到无关记忆 */
+  topic?: string;
   /** 最近对话（不含当前输入） */
   history: ChatHistoryItem[];
   userText: string;
@@ -32,7 +38,12 @@ export interface RuntimePromptResult {
 
 /** 在人格卡 prompt 后追加状态/场次/记忆/安全约束 */
 export function buildRuntimeMessages(options: RuntimePromptOptions): RuntimePromptResult {
-  const base = buildSystemPrompt(options.persona, options.profile);
+  const base = buildSystemPrompt(options.persona, {
+    ...options.profile,
+    relationship: options.relationship ?? options.profile?.relationship,
+    styleCalibration: options.styleCalibration ?? options.profile?.styleCalibration,
+    moodNote: options.moodNote ?? options.profile?.moodNote,
+  });
   const memory = assembleMemoryContext({
     recent: options.history
       .filter((item) => item.from !== "system" && item.text.trim().length > 0)
@@ -59,6 +70,9 @@ export function buildRuntimeMessages(options: RuntimePromptOptions): RuntimeProm
     sections.push("", "【事实锁约束】", `- ${options.guard.note}`);
   }
   sections.push("", "【记忆（按相关度排序，不要逐字复述）】", memory.text || "（暂无）");
+  if (options.topic?.trim()) {
+    sections.push("", "【当前话题】", `- ${options.topic.trim()}`, "- 先接住用户上一句，再决定是否换话题；不要为了用记忆突然跳题。");
+  }
   if (options.arc.scene === "reconcile") {
     sections.push("", `【和解场次】还剩 ${options.arc.stepDownRemaining} 轮递台阶；不要翻旧账。`);
   }

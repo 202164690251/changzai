@@ -112,6 +112,8 @@ powershell -ExecutionPolicy Bypass -File scripts\build.ps1   # Windows 安装包
 | Step 6 安全/备份 | ✅ 启动 PIN；加密 .czbak（DB+key+媒体）；一键销毁（覆盖写）；危机资源 |
 | Step 6 聊天壳增强 | ✅ 可变高度虚拟滚动；复制/删除/引用/重新编辑/撤回；翻一翻；夜间模式；90min 提醒 |
 | Step 6 人格审阅 | ✅ 事实逐条移除/补充、保存、最多 10 版回滚 |
+| Step 7 关系/状态/校准 | ✅ 关系卡自动总结+可编辑；ta 状态面板；主动消息秒级/不限/可关免打扰；风格校准默认关闭 |
+| Step 7 上下文持久化 | ✅ 聊天记录落 SQLCipher（重启恢复）；话题短摘要 + 记忆检索 + 先接上一句 |
 | Step 7 评测骨架 | ✅ 黄金集 20 条 + `pnpm eval`（20/20 mock）；合规草案、发布说明、官网模板 |
 | 技术自检面板 | ✅ 从主界面移除；`#/dev` 或 Ctrl+Shift+D 进入开发页 |
 | 多端（iOS/Android） | ⏳ 本期不做（架构已保留） |

@@ -11,6 +11,7 @@ import {
   type PersonaProfile,
   type ProactiveDesire,
   type ProactiveState,
+  type RelationshipProfile,
 } from "@changzai/core";
 import { isPermissionGranted, requestPermission, sendNotification } from "@tauri-apps/plugin-notification";
 import { api, isTauri, type LlmConfig } from "../lib/tauri.ts";
@@ -23,6 +24,9 @@ export interface ProactiveOptions {
   llm: LlmConfig | null;
   herName: string;
   meName: string;
+  relationship?: RelationshipProfile | null;
+  styleCalibration?: string;
+  moodNote?: string;
   lastUserAt: number;
   onMessage: (text: string) => void;
   onNotice: (text: string) => void;
@@ -35,6 +39,7 @@ export interface ProactiveApi {
   setEnabled: (enabled: boolean) => void;
   setDesire: (level: ProactiveDesire) => void;
   updateSettings: (patch: Partial<ProactiveState>) => void;
+  setPaused: (minutes: number | null) => void;
   test: () => Promise<void>;
 }
 
@@ -72,8 +77,18 @@ export function useProactive(options: ProactiveOptions): ProactiveApi {
       try {
         const raw = await api.settingGet(SETTING_KEY);
         if (!alive || raw === null) return;
-        const parsed = JSON.parse(raw) as Partial<ProactiveState>;
-        setState({ ...DEFAULT_PROACTIVE_STATE, ...parsed });
+        const parsed = JSON.parse(raw) as Partial<ProactiveState> & {
+          minIdleMinutes?: number;
+          checkIntervalMinutes?: number;
+        };
+        const migrated: Partial<ProactiveState> = { ...parsed };
+        if (typeof parsed.minIdleSeconds !== "number" && typeof parsed.minIdleMinutes === "number") {
+          migrated.minIdleSeconds = Math.max(1, Math.round(parsed.minIdleMinutes * 60));
+        }
+        if (typeof parsed.checkIntervalSeconds !== "number" && typeof parsed.checkIntervalMinutes === "number") {
+          migrated.checkIntervalSeconds = Math.max(3, Math.round(parsed.checkIntervalMinutes * 60));
+        }
+        setState({ ...DEFAULT_PROACTIVE_STATE, ...migrated });
       } catch {
         /* 默认关闭 */
       }
@@ -111,6 +126,14 @@ export function useProactive(options: ProactiveOptions): ProactiveApi {
     [persist],
   );
 
+  const setPaused = useCallback(
+    (minutes: number | null) => {
+      const pausedUntil = minutes === null ? 0 : Date.now() + Math.max(1, minutes) * 60_000;
+      persist({ ...stateRef.current, pausedUntil });
+    },
+    [persist],
+  );
+
   useEffect(() => {
     if (options.lastUserAt <= 0) return;
     persist({
@@ -122,7 +145,7 @@ export function useProactive(options: ProactiveOptions): ProactiveApi {
 
   const generate = useCallback(async (): Promise<void> => {
     if (busyRef.current) return;
-    const { persona, llm, herName, meName, onMessage, onNotice } = optionsRef.current;
+    const { persona, llm, herName, meName, relationship, styleCalibration, moodNote, onMessage, onNotice } = optionsRef.current;
     if (!persona || !llmReady(llm)) {
       onNotice("主动消息需要人格卡和模型配置");
       return;
@@ -180,9 +203,9 @@ export function useProactive(options: ProactiveOptions): ProactiveApi {
       const plan = planProactive({ ...current, lastUserAt }, Date.now());
       setPlanReason(plan.reason);
       if (plan.shouldSend) void generate();
-    }, Math.max(1, state.checkIntervalMinutes) * 60_000);
+    }, Math.max(3, state.checkIntervalSeconds) * 1000);
     return () => window.clearInterval(timer);
-  }, [generate, state.checkIntervalMinutes, state.enabled]);
+  }, [generate, state.checkIntervalSeconds, state.enabled]);
 
-  return { state, busy, planReason, setEnabled, setDesire, updateSettings, test };
+  return { state, busy, planReason, setEnabled, setDesire, updateSettings, setPaused, test };
 }
