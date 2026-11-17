@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactElement } from "react";
-import { useChat, lastMessageOf, messagePreview } from "../hooks/useChat.ts";
+import { useChat, lastMessageOf, messagePreview, type ChatMsg } from "../hooks/useChat.ts";
 import { useAnalytics } from "../hooks/useAnalytics.ts";
 import { useDatabase } from "../hooks/useDatabase.ts";
 import { useEmotion } from "../hooks/useEmotion.ts";
 import { useImport } from "../hooks/useImport.ts";
 import { useLlmConfig } from "../hooks/useLlmConfig.ts";
 import { useMediaImport } from "../hooks/useMediaImport.ts";
+import { useOnboarding } from "../hooks/useOnboarding.ts";
 import { usePersona } from "../hooks/usePersona.ts";
 import { useProactive } from "../hooks/useProactive.ts";
 import { useProfile } from "../hooks/useProfile.ts";
@@ -23,6 +24,7 @@ import { ImageLightbox, type PreviewImage } from "./ImageLightbox.tsx";
 import { ImportWizard } from "./ImportWizard.tsx";
 import { MessageList } from "./MessageList.tsx";
 import { NavRail, type RailTab } from "./NavRail.tsx";
+import { Onboarding } from "./Onboarding.tsx";
 import { SettingsDrawer } from "./SettingsDrawer.tsx";
 import { SidePanel } from "./SidePanel.tsx";
 import { Toast } from "./Toast.tsx";
@@ -34,9 +36,10 @@ export function ChatShell(): ReactElement {
   const persona = usePersona();
   const emotion = useEmotion();
   const analytics = useAnalytics();
+  const onboarding = useOnboarding();
   const { profile, storageError, setName, setAvatar, reset } = useProfile(db.ready);
   const { toast, show } = useToast();
-  const { messages, typing, unread, sendText, sendImage, appendImported, appendProactive, recallLastMessage, clear, markRead } = useChat({
+  const { messages, typing, unread, sendText, sendImage, appendImported, appendProactive, recallLastMessage, deleteMessage, clear, markRead } = useChat({
     persona: persona.profile,
     llm: llm.config,
     herName: displayName(profile.her, "ta"),
@@ -54,6 +57,11 @@ export function ChatShell(): ReactElement {
   const [llmTesting, setLlmTesting] = useState(false);
   const [llmTest, setLlmTest] = useState<{ ok: boolean; text: string; error: string } | null>(null);
   const [lastUserAt, setLastUserAt] = useState(0);
+  const [safetyBusy, setSafetyBusy] = useState(false);
+  const [safetyMessage, setSafetyMessage] = useState<string | null>(null);
+  const [messageMenu, setMessageMenu] = useState<{ message: ChatMsg; x: number; y: number } | null>(null);
+  const [reminder, setReminder] = useState(false);
+  const night = new Date().getHours() >= 23 || new Date().getHours() < 7;
   const importer = useImport(async (result) => {
     await db.refresh();
     await persona.buildFromImport(result.messages);
@@ -70,6 +78,14 @@ export function ChatShell(): ReactElement {
   }, [analytics, db.ready]);
 
   const loggedFirst = useRef(false);
+
+  useEffect(() => {
+    const start = Date.now();
+    const timer = window.setInterval(() => {
+      if (Date.now() - start >= 90 * 60_000) setReminder(true);
+    }, 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   // 已有消息但记忆为空时（老版本升级）自动重建一次
   useEffect(() => {
@@ -102,18 +118,65 @@ export function ChatShell(): ReactElement {
     importer.reset();
   }, [importer]);
 
-  const handleTestLlm = useCallback(async () => {
-    setLlmTesting(true);
-    setLlmTest(null);
+  const handleTestLlm = useCallback(
+    async (config: { provider: string; baseUrl: string; model: string; fastModel: string; apiKey: string; temperature: number }) => {
+      setLlmTesting(true);
+      setLlmTest(null);
+      try {
+        await llm.save(config);
+        const result = await api.llmTest();
+        setLlmTest(result);
+      } catch (error) {
+        setLlmTest({ ok: false, text: "", error: error instanceof Error ? error.message : String(error) });
+      } finally {
+        setLlmTesting(false);
+      }
+    },
+    [llm],
+  );
+
+  const handleBackup = useCallback(async (passphrase: string) => {
+    setSafetyBusy(true);
+    setSafetyMessage(null);
     try {
-      const result = await api.llmTest();
-      setLlmTest(result);
+      const result = await api.backupExport(passphrase);
+      setSafetyMessage(result.ok ? `备份已保存：${result.path}` : result.message);
     } catch (error) {
-      setLlmTest({ ok: false, text: "", error: error instanceof Error ? error.message : String(error) });
+      setSafetyMessage(error instanceof Error ? error.message : String(error));
     } finally {
-      setLlmTesting(false);
+      setSafetyBusy(false);
     }
   }, []);
+
+  const handleRestore = useCallback(async (passphrase: string) => {
+    setSafetyBusy(true);
+    setSafetyMessage(null);
+    try {
+      const result = await api.backupRestore(passphrase);
+      setSafetyMessage(result.message);
+    } catch (error) {
+      setSafetyMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setSafetyBusy(false);
+    }
+  }, []);
+
+  const handleDestroy = useCallback(
+    async (confirm: string) => {
+      setSafetyBusy(true);
+      setSafetyMessage(null);
+      try {
+        const result = await api.dataDestroy(confirm);
+        setSafetyMessage(result.message);
+        clear();
+      } catch (error) {
+        setSafetyMessage(error instanceof Error ? error.message : String(error));
+      } finally {
+        setSafetyBusy(false);
+      }
+    },
+    [clear],
+  );
 
   const handleImported = useCallback(
     (files: ImportedMediaFile[]) => {
@@ -200,7 +263,7 @@ export function ChatShell(): ReactElement {
   );
 
   return (
-    <div className="chat-shell">
+    <div className={`chat-shell${night ? " night" : ""}`}>
       <NavRail me={me} active={railTab} onSelect={handleRailSelect} onOpenSettings={() => setSettingsOpen(true)} />
 
       {railTab === "chat" ? (
@@ -226,10 +289,25 @@ export function ChatShell(): ReactElement {
           onOpenSettings={() => setSettingsOpen(true)}
           onRecall={recallLastMessage}
         />
+        {reminder && (
+          <div className="safety-banner">
+            已经聊了一段时间了。要不要起身喝口水、看看窗外？现实里的你也重要。
+            <button type="button" className="link-btn" onClick={() => setReminder(false)}>
+              知道了
+            </button>
+          </div>
+        )}
         {messages.length === 0 && persona.profile !== null && (
           <div className="chat-ready-hint">已生成 ta 的人格卡，发一句试试。</div>
         )}
-        <MessageList messages={messages} her={her} me={me} typing={typing} onPreview={setPreview} />
+        <MessageList
+          messages={messages}
+          her={her}
+          me={me}
+          typing={typing}
+          onPreview={setPreview}
+          onMessageMenu={(message, event) => setMessageMenu({ message, x: event.clientX, y: event.clientY })}
+        />
         <Composer onSend={handleSend} onPickImage={handlePickImage} onUnavailable={handleUnavailable} />
       </main>
 
@@ -256,7 +334,7 @@ export function ChatShell(): ReactElement {
             void llm.save(config);
           }}
           onTestLlm={() => {
-            void handleTestLlm();
+            void handleTestLlm(llm.config);
           }}
           persona={persona.profile}
           personaBusy={persona.busy}
@@ -275,6 +353,17 @@ export function ChatShell(): ReactElement {
           onTestProactive={() => {
             void proactive.test();
           }}
+          safetyBusy={safetyBusy}
+          safetyMessage={safetyMessage}
+          onBackup={(passphrase) => {
+            void handleBackup(passphrase);
+          }}
+          onRestore={(passphrase) => {
+            void handleRestore(passphrase);
+          }}
+          onDestroy={(confirm) => {
+            void handleDestroy(confirm);
+          }}
         />
       )}
 
@@ -287,6 +376,62 @@ export function ChatShell(): ReactElement {
         onReset={importer.reset}
         onClose={closeImport}
       />
+
+      <Onboarding
+        open={onboarding.ready && !onboarding.done && db.ready}
+        dbStats={db.stats}
+        importState={importer.state}
+        persona={persona.profile}
+        llmConfig={llm.config}
+        onOpenImport={openImport}
+        onSaveLlm={(config) => {
+          void llm.save(config);
+        }}
+        onFinish={onboarding.complete}
+        onSkip={onboarding.complete}
+      />
+
+      {messageMenu !== null && (
+        <div className="message-menu-backdrop" onClick={() => setMessageMenu(null)}>
+          <div
+            className="message-menu"
+            style={{ left: messageMenu.x, top: messageMenu.y }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            {messageMenu.message.kind === "text" && (
+              <button
+                type="button"
+                onClick={() => {
+                  void navigator.clipboard.writeText(messageMenu.message.kind === "text" ? messageMenu.message.text : "");
+                  setMessageMenu(null);
+                }}
+              >
+                复制
+              </button>
+            )}
+            {messageMenu.message.from === "her" && (
+              <button
+                type="button"
+                onClick={() => {
+                  recallLastMessage();
+                  setMessageMenu(null);
+                }}
+              >
+                撤回
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                deleteMessage(messageMenu.message.id);
+                setMessageMenu(null);
+              }}
+            >
+              删除
+            </button>
+          </div>
+        </div>
+      )}
 
       <ImageLightbox image={preview} onClose={() => setPreview(null)} />
       <Toast text={toast?.text ?? null} />

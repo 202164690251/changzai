@@ -75,7 +75,7 @@ fn derive_key(passphrase: &str, salt: &[u8]) -> Result<[u8; 32], String> {
     Ok(key)
 }
 
-fn seal(passphrase: &str, plaintext: &[u8]) -> Result<Vec<u8>, String> {
+pub(crate) fn seal(passphrase: &str, plaintext: &[u8]) -> Result<Vec<u8>, String> {
     let mut salt = [0u8; 16];
     rand::thread_rng().fill_bytes(&mut salt);
     let key = derive_key(passphrase, &salt)?;
@@ -93,7 +93,7 @@ fn seal(passphrase: &str, plaintext: &[u8]) -> Result<Vec<u8>, String> {
     Ok(out)
 }
 
-fn unseal(passphrase: &str, blob: &[u8]) -> Result<Vec<u8>, String> {
+pub(crate) fn unseal(passphrase: &str, blob: &[u8]) -> Result<Vec<u8>, String> {
     if blob.len() < 8 + 16 + 12 || &blob[0..8] != b"CZSEAL1\0" {
         return Err("bad seal header".to_string());
     }
