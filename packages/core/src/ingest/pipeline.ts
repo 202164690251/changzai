@@ -10,6 +10,7 @@ import { WechatmsgTxtAdapter } from "./adapters/wechatmsg-txt.ts";
 import { WechatmsgCsvAdapter } from "./adapters/wechatmsg-csv.ts";
 import { LiuhenJsonAdapter } from "./adapters/liuhen-json.ts";
 import { QqTxtAdapter } from "./adapters/qq-txt.ts";
+import { ChatDataJsAdapter } from "./adapters/chatdata-js.ts";
 import { dedupeMessages, normalizeMessage, sortMessages, validateMessage } from "./schema.ts";
 import { fillBehaviorSignals } from "./burst.ts";
 import { buildHealthReport } from "./report.ts";
@@ -53,7 +54,8 @@ export function createDefaultRegistry(): AdapterRegistry {
     .register(new WechatmsgCsvAdapter())
     .register(new LiuhenJsonAdapter())
     .register(new WechatmsgTxtAdapter())
-    .register(new QqTxtAdapter());
+    .register(new QqTxtAdapter())
+    .register(new ChatDataJsAdapter());
 }
 
 /** 供设置页/导入向导展示的支持格式 */

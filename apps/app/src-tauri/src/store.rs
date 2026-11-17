@@ -756,8 +756,8 @@ pub async fn pick_import_files(app: tauri::AppHandle) -> Result<PickImportResult
     let (tx, rx) = tokio::sync::oneshot::channel();
     app.dialog()
         .file()
-        .set_title("选择聊天记录导出文件（txt / csv / json）")
-        .add_filter("聊天记录", &["txt", "csv", "json"])
+        .set_title("选择聊天记录导出文件（txt / csv / json / data.js）")
+        .add_filter("聊天记录", &["txt", "csv", "json", "js"])
         .pick_files(move |paths| {
             let _ = tx.send(paths);
         });

@@ -89,7 +89,7 @@ powershell -ExecutionPolicy Bypass -File scripts\build.ps1   # Windows 安装包
 | UI：微信桌面版风格 | ✅ 三栏布局、双方头像、图片/语音气泡、设置抽屉 |
 | 双方昵称/头像自定义 | ✅ 设置页可改；已写入 SQLCipher `profile` 表（localStorage 双写兜底） |
 | 图片/语音素材导入 | ✅ 设置页导入 → 气泡展示；记录写入 `media` 表 |
-| Step 2 导入适配器（5 种） | ✅ wechatmsg_txt / csv / liuhen_json / qq_txt / plaintext_paste（10 项单测） |
+| Step 2 导入适配器（6 种） | ✅ wechatmsg_txt / csv / liuhen_json / qq_txt / plaintext_paste / **chatdata_js**（13 项单测） |
 | Step 2 导入向导 + 体检报告 | ✅ 设置 → 数据 → 导入聊天记录；解析/去重/burst/latency/holdout 后写入 SQLCipher |
 | Step 2 真实数据持久化 | ✅ `db_init` / `import_persist` / `db_stats` / `profile_*` / `media_persist`；Rust 4 项测试 |
 | Step 2 示例数据 | ✅ `examples/` 合成聊天文件，可直接导入测试（无隐私） |

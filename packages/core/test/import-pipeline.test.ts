@@ -155,10 +155,11 @@ test("applyHoldoutSplit：只标她的文字消息，且同 seed 结果稳定", 
   assert.ok(first.messages.filter((m) => m.is_holdout === 1).every((m) => m.sender === "her"));
 });
 
-test("adapterCatalog：默认注册 5 个适配器", () => {
+test("adapterCatalog：默认注册 6 个适配器", () => {
   const catalog = adapterCatalog();
-  assert.equal(catalog.length, 5);
+  assert.equal(catalog.length, 6);
   assert.ok(catalog.some((item) => item.name === "wechatmsg_txt"));
+  assert.ok(catalog.some((item) => item.name === "chatdata_js"));
   assert.ok(catalog.some((item) => item.name === "plaintext_paste"));
 });
 
