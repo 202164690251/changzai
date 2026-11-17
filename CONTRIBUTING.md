@@ -94,11 +94,67 @@ git push -u origin feat/ui-wechat-shell
 - 构建：`powershell -ExecutionPolicy Bypass -File scripts\build.ps1`
 - 产物：`release/Changzai_<version>_x64-setup.exe`（未签名前仅内测分发；签名证书到位后替换）。
 
-## 8. 邀请协作者 / 外部贡献
+## 8. 合并审核与 main 保护（重要）
 
-- **团队协作（有写权限）**：仓库 Settings → Collaborators → Add people，按 GitHub 用户名邀请，权限给 `Write`（不要给 Admin）。
-- **外部贡献（无写权限）**：Fork 本仓库 → 在 fork 上开分支 → 向本仓库 `main` 发 PR，同样过 CI + review。
-- 分支保护：当前靠团队约定 + CI + Review；若仓库升级 GitHub Pro 或设为 Public，可在 Settings → Branches 启用强制保护（禁止直接 push、要求 review/CI）。
+### 8.1 当前限制（已实测）
+
+仓库目前是 **private + GitHub Free**。这种组合下 GitHub 不提供强制分支保护：调用分支保护或 Rulesets API 都会返回
+`403 Upgrade to GitHub Pro or make this repository public to enable this feature`。
+所以现在没有任何“平台强制必须审核才能进 main”的开关。
+
+### 8.2 三种实现方式
+
+#### 方案 A（推荐、零成本）：协作者只给 Read 权限 + Fork/PR
+
+这是免费私有仓库下最接近“我审核后他们才能进 main”的做法：
+
+1. 仓库 Settings → Collaborators → Add people，把对方权限设为 **Read**（不要 Write）；
+2. 对方在 GitHub 网页点 **Fork**（私有仓库的 fork 也是 private，本仓库已开启 allow_forking）；
+3. 对方 clone **自己的 fork**，在自己的分支上开发并 push 到 fork；
+4. 对方从 fork 向本仓库 `main` 发 **Pull Request**；
+5. CI 跑完、你 review 并点 **Squash merge** 后，代码才进入 main。
+
+效果：**对方没有 main 的写权限，不能直接 push，也不能合并 PR；只有你审核并合并后提交才进入 main。**
+代价：对方不能在主仓库建共享分支（都在自己 fork 里）；适合外部/外包/实习贡献者。
+注意：来自 fork 的首次 PR，CI 需要你点一次 “Approve and run workflows”。
+
+#### 方案 B（最标准、需要 Public 或 GitHub Pro）：开启强制分支保护 / Rulesets
+
+前置二选一：
+- 仓库 Settings → General → Danger Zone → **Change visibility → Public**（免费即可用）；或
+- 升级 **GitHub Pro**（私有仓库也可用）。
+
+然后（二选一）：
+
+**Classic 分支保护**：Settings → Branches → Add branch protection rule
+- Branch name pattern：`main`
+- ☑ Require a pull request before merging
+  - Required approvals：`1`
+  - ☑ Dismiss stale pull request approvals when new commits are pushed
+  - ☑ Require review from Code Owners（仓库已有 `.github/CODEOWNERS`）
+- ☑ Require status checks to pass before merging
+  - 勾选 CI 的 `web` 与 `rust`
+  - ☑ Require branches to be up to date before merging
+- ☑ Require conversation resolution before merging
+- ☑ Do not allow bypassing the above settings
+- 关闭 Allow force pushes / Allow deletions
+
+**Rulesets（新版界面）**：Settings → Rules → Rulesets → New branch ruleset
+- Target branches：`main`
+- Rules：Require a pull request（1 approval）+ Require status checks（`web`、`rust`）+ Block force pushes + Restrict deletions
+- Enforcement status：**Active**
+
+开启后：任何协作者（包括 Write 权限）直接 push main 都会被拒绝；PR 必须 **1 人 review + CI 全绿** 才能合并；即使管理员默认也不能绕过（如勾选 Do not allow bypassing）。
+
+#### 方案 C（不推荐）：Write 权限 + 团队口头约定
+
+给协作者 Write 权限、约定“必须走 PR”。在没有平台保护的情况下，这**不能阻止**对方直接 push main，只能事后 review/回滚。只适合完全信任的小团队临时使用。
+
+### 8.3 建议
+
+- **外部/外包/短期贡献者**：用方案 A（Read + Fork/PR），零成本，效果就是“你审核后才进 main”；
+- **长期核心成员、需要共享分支**：把仓库设为 Public（若内容可公开）或升级 Pro，然后用方案 B 的强制保护；
+- 需要我帮你切换哪种，直接说：我可以把仓库改成 Public 并立刻开保护，或按方案 A 更新邀请/文档。
 
 ## 9. 出问题找谁
 
