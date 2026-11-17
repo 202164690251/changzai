@@ -1,0 +1,17 @@
+{
+  "messages": [
+    { "CreateTime": "2024-03-02 21:14:08", "IsSender": 0, "StrContent": "今天下班有点晚", "Type": 1 },
+    { "CreateTime": "2024-03-02 21:15:20", "IsSender": 1, "StrContent": "又加班？", "Type": 1 },
+    { "CreateTime": "2024-03-02 21:16:02", "IsSender": 0, "StrContent": "嗯 刚到家", "Type": 1 },
+    { "CreateTime": "2024-03-02 21:17:35", "IsSender": 1, "StrContent": "吃饭了吗", "Type": 1 },
+    { "CreateTime": "2024-03-02 21:18:11", "IsSender": 0, "StrContent": "还没 懒得做", "Type": 1 },
+    { "CreateTime": "2024-03-02 21:19:40", "IsSender": 1, "StrContent": "那我给你点个外卖", "Type": 1 },
+    { "CreateTime": "2024-03-02 21:20:05", "IsSender": 0, "StrContent": "不要 太晚了", "Type": 1 },
+    { "CreateTime": "2024-03-02 21:21:30", "IsSender": 0, "StrContent": "你也早点睡", "Type": 1 },
+    { "CreateTime": "2024-03-02 23:48:12", "IsSender": 1, "StrContent": "睡不着", "Type": 1 },
+    { "CreateTime": "2024-03-02 23:50:42", "IsSender": 0, "StrContent": "那我陪你一会儿", "Type": 1 },
+    { "CreateTime": "2024-03-03 00:05:18", "IsSender": 1, "StrContent": "明天降温 记得穿外套", "Type": 1 },
+    { "CreateTime": "2024-03-03 00:06:00", "IsSender": 0, "StrContent": "知道了", "Type": 1 },
+    { "CreateTime": "2024-03-03 00:07:10", "IsSender": 0, "StrContent": "图片", "Type": 3 }
+  ]
+}

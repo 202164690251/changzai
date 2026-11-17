@@ -37,6 +37,17 @@ export function useMediaImport(onImported: (files: ImportedMediaFile[]) => void)
           const files = Array.isArray(result.files) ? result.files : [];
           if (result.ok && files.length > 0) {
             onImported(files);
+            // Step 2：把素材记录写入 media 表（失败不阻塞 UI，文件已经落盘）
+            void api
+              .mediaPersist(
+                files.map((file) => ({
+                  name: file.name,
+                  path: file.path,
+                  size: file.size,
+                  kind: file.kind,
+                })),
+              )
+              .catch(() => undefined);
             setState((previous) => {
               const count = previous.count + files.length;
               return { busy: false, ok: true, message: `已导入 ${count} 个素材`, count };

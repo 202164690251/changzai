@@ -87,8 +87,12 @@ powershell -ExecutionPolicy Bypass -File scripts\build.ps1   # Windows 安装包
 | Step 1 Rust 流式 HTTP | ✅ 本地 chunked echo 测试通过 |
 | Step 1 安装包 | ✅ `release/Changzai_0.1.0_x64-setup.exe`（NSIS，未签名） |
 | UI：微信桌面版风格 | ✅ 三栏布局、双方头像、图片/语音气泡、设置抽屉 |
-| 双方昵称/头像自定义 | ✅ 设置页可改（localStorage；Step 2 落库） |
-| 图片/语音素材导入 | ✅ 设置页导入 → 气泡展示（后端 Rust 命令 + `media` 表 schema 已就绪） |
+| 双方昵称/头像自定义 | ✅ 设置页可改；已写入 SQLCipher `profile` 表（localStorage 双写兜底） |
+| 图片/语音素材导入 | ✅ 设置页导入 → 气泡展示；记录写入 `media` 表 |
+| Step 2 导入适配器（5 种） | ✅ wechatmsg_txt / csv / liuhen_json / qq_txt / plaintext_paste（10 项单测） |
+| Step 2 导入向导 + 体检报告 | ✅ 设置 → 数据 → 导入聊天记录；解析/去重/burst/latency/holdout 后写入 SQLCipher |
+| Step 2 真实数据持久化 | ✅ `db_init` / `import_persist` / `db_stats` / `profile_*` / `media_persist`；Rust 4 项测试 |
+| Step 2 示例数据 | ✅ `examples/` 合成聊天文件，可直接导入测试（无隐私） |
 | AI 披露方式 | ✅ 不做每条气泡角标；改为「设置 → 使用说明」+ 首启说明（见 `docs/step0-decisions.md`） |
 | 技术自检面板 | ✅ 从主界面移除；`#/dev` 或 Ctrl+Shift+D 进入开发页 |
 | 多端（iOS/Android） | ⏳ 本期不做（架构已保留） |
@@ -116,13 +120,11 @@ git switch -c feat/your-task
 4. 数据格式带 `schema_version`，迁移可重放；
 5. 调度（纯逻辑）与投递（平台实现）分离。
 
-## 接下来（Step 2：数据管道）
+## 接下来（Step 3：人格蒸馏与可聊）
 
-1. 五个导入适配器（wechatmsg_txt / csv / liuhen_json / qq_txt / plaintext_paste）接真实数据；
-2. `CoreAPI.importFiles` + 进度/断点续跑 + 5 万条性能；
-3. 体检报告接 UI（core 已实现计算，需 SQLCipher 持久化）；
-4. 媒体按 `msg_id` 入 `media` 表（图片/语音/文件）；
-5. 人格卡审阅 + Correction 层；holdout 泄漏校验 + 黄金集；
-6. 双方资料从 localStorage 迁到 `profile` 表。
+1. 情绪标注 + Kappa 校准；Style Card / Episode / 情境-反应对 / 事实锁；
+2. 人格卡审阅 + Correction 层；holdout 泄漏校验 + 黄金集回归；
+3. 对话运行时（Compose/Decide/Filter）+ 多模型接入；
+4. 用真实数据跑 5 万条性能与首次盲测。
 
-> 验收门槛：已有导出文件 → 5 分钟内首次对话；5 万条导入 <90s；体检报告字段齐全。
+> Step 2 进度与限制见 [docs/step2-progress.md](docs/step2-progress.md)；详细任务拆分见 [docs/step2-plan.md](docs/step2-plan.md)。

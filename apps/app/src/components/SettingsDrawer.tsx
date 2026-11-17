@@ -3,7 +3,7 @@ import type { ChangeEvent, ReactElement } from "react";
 import type { ImportState } from "../hooks/useMediaImport.ts";
 import { readAvatarFile } from "../lib/avatar.ts";
 import { MAX_NAME_LENGTH, displayName, type PersonKey, type Profile } from "../lib/profile.ts";
-import type { MediaKind } from "../lib/tauri.ts";
+import type { DbStats, MediaKind } from "../lib/tauri.ts";
 import { Avatar } from "./Avatar.tsx";
 import { Icon } from "./Icons.tsx";
 
@@ -17,6 +17,10 @@ export interface SettingsDrawerProps {
   media: ImportState;
   canImport: boolean;
   onImport: (kind: MediaKind) => void;
+  dbStats: DbStats | null;
+  dbReady: boolean;
+  dbError: string | null;
+  onOpenImport: () => void;
 }
 
 /** 设置抽屉：双方昵称/头像、回忆素材导入、使用说明。 */
@@ -30,6 +34,10 @@ export function SettingsDrawer({
   media,
   canImport,
   onImport,
+  dbStats,
+  dbReady,
+  dbError,
+  onOpenImport,
 }: SettingsDrawerProps): ReactElement {
   const herInputRef = useRef<HTMLInputElement | null>(null);
   const meInputRef = useRef<HTMLInputElement | null>(null);
@@ -134,6 +142,31 @@ export function SettingsDrawer({
             {renderPerson("me", "我的昵称", meInputRef)}
             {avatarError !== null && <p className="settings-warn">{avatarError}</p>}
             {storageError !== null && <p className="settings-warn">{storageError}</p>}
+          </section>
+
+          <section className="settings-section" aria-labelledby="settings-data">
+            <header className="settings-section-head">
+              <h3 id="settings-data">数据</h3>
+            </header>
+            <p className="settings-hint">
+              导入你和{herName}的微信聊天记录（txt / csv / json），会自动生成体检报告并加密保存在本机。
+            </p>
+            {dbError !== null && <p className="settings-warn">{dbError}</p>}
+            {dbReady && dbStats?.ok ? (
+              <p className="settings-note">
+                已导入 {dbStats.messageCount.toLocaleString("zh-CN")} 条消息（她的{" "}
+                {dbStats.herCount.toLocaleString("zh-CN")} 条，holdout {dbStats.holdoutCount} 条），跨度{" "}
+                {dbStats.spanDays} 天。
+              </p>
+            ) : (
+              <p className="settings-note">{dbReady ? "还没有导入聊天记录。" : "正在初始化本地数据库…"}</p>
+            )}
+            <div className="media-actions">
+              <button type="button" className="btn primary" disabled={!dbReady} onClick={onOpenImport}>
+                导入聊天记录
+              </button>
+            </div>
+            <p className="settings-hint">导入完成后，Step 3 才会开始人格蒸馏；本版本先完成数据管道与体检。</p>
           </section>
 
           <section className="settings-section" aria-labelledby="settings-media">

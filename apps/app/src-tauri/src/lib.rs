@@ -1,6 +1,7 @@
 mod db;
 mod http_probe;
 mod media;
+mod store;
 mod tray;
 
 use serde::Serialize;
@@ -64,7 +65,14 @@ pub fn run() {
             notify_probe,
             db::db_probe,
             http_probe::http_stream_probe,
-            media::import_media_files
+            media::import_media_files,
+            store::db_init,
+            store::db_stats,
+            store::import_persist,
+            store::profile_save,
+            store::profile_load,
+            store::media_persist,
+            store::pick_import_files
         ])
         .setup(|app| {
             // 托盘常驻：关闭窗口 = 隐藏，进程继续跑（主动消息的前提）
