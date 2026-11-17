@@ -121,7 +121,7 @@ export function ConversationList({
                 <span className="conv-top">
                   <span className="conv-name">{item.title}</span>
                   <span className="conv-time">
-                    {formatConversationTime(item.lastMessageAt ?? item.updatedAt)}
+                    {formatConversationTime(item.lastMessageAt || item.updatedAt)}
                   </span>
                 </span>
                 <span className="conv-preview">{item.lastPreview ?? "还没有开始"}</span>
