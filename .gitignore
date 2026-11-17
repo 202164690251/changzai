@@ -1,0 +1,38 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# build
+dist/
+target/
+apps/app/src-tauri/target/
+*.tsbuildinfo
+
+# runtime data（绝不可入库）
+data/
+media/
+exports/
+logs/
+*.db
+*.db-wal
+*.db-shm
+
+# spike results（可重新生成；报告在 docs/）
+spikes/results/
+
+# env / local
+.env
+.env.local
+*.local
+.DS_Store
+Thumbs.db
+
+# 本机工具
+rustup-init.exe
+
+# 本机生成的 shim（含绝对路径）
+scripts/bin/
+
+# 本地构建产物（安装包体积大，不入库）
+release/
+*.log

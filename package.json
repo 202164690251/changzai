@@ -1,0 +1,24 @@
+{
+  "name": "changzai",
+  "version": "0.1.0",
+  "private": true,
+  "description": "常在 Still Here · Windows PC 单端",
+  "type": "module",
+  "scripts": {
+    "dev": "powershell -ExecutionPolicy Bypass -File scripts/dev.ps1",
+    "dev:web": "pnpm --filter @changzai/app dev",
+    "build": "powershell -ExecutionPolicy Bypass -File scripts/build.ps1",
+    "build:web": "pnpm --filter @changzai/app build",
+    "typecheck": "pnpm --filter @changzai/app exec tsc --noEmit && pnpm exec tsc -p packages/core/tsconfig.json --noEmit",
+    "test": "node --test packages/core/test/*.test.ts",
+    "spikes": "powershell -ExecutionPolicy Bypass -File scripts/run-spikes.ps1",
+    "env": "powershell -ExecutionPolicy Bypass -File scripts/env.ps1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.8.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

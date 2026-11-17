@@ -1,0 +1,444 @@
+/* 常在 · Step 1 桌面壳样式
+   设计 token 与 packages/shared/src/design-tokens.ts、docs/step0-design-baseline.md 对齐 */
+
+:root {
+  --bg: #ededed;
+  --bubble-me: #95ec69;
+  --bubble-her: #ffffff;
+  --text: #191919;
+  --sub: #b2b2b2;
+  --nav-bg: #f7f7f7;
+  --border: #dadada;
+  --danger: #fa5151;
+  --nav-h: 44px;
+  --composer-h: 56px;
+  --radius: 6px;
+  --radius-avatar: 4px;
+  --bubble-max: 70%;
+  --avatar: 40px;
+  --font-size: 17px;
+  --line-height: 1.45;
+  --font: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  --ai-badge: 10px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111111;
+    --bubble-me: #3eb575;
+    --bubble-her: #2c2c2c;
+    --text: #e5e5e5;
+    --sub: #8a8a8a;
+    --nav-bg: #1c1c1c;
+    --border: #2a2a2a;
+    --danger: #ff6b6b;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: var(--font);
+  font-size: 14px;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.app-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 56px;
+  padding: 0 18px;
+  background: var(--nav-bg);
+  border-bottom: 1px solid var(--border);
+  -webkit-app-region: drag;
+}
+
+.brand {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.brand-mark {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--bubble-me);
+  color: #10351c;
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.brand div {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.pill {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--sub);
+  font-size: 12px;
+  background: transparent;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(380px, 460px) 1fr;
+  gap: 16px;
+  padding: 16px;
+  min-height: 0;
+  flex: 1;
+}
+
+.muted {
+  color: var(--sub);
+}
+
+.small {
+  font-size: 12px;
+}
+
+.footnote {
+  margin: 12px 2px 0;
+  color: var(--sub);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* ---------- 自检面板 ---------- */
+.spike-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 16px;
+  background: var(--bubble-her);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: auto;
+}
+
+.spike-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.spike-head h2 {
+  font-size: 16px;
+  margin: 0 0 4px;
+}
+
+.spike-head p {
+  margin: 0;
+}
+
+.spike-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.spike-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  background: color-mix(in srgb, var(--bubble-her) 92%, var(--bg));
+}
+
+.spike-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.spike-card h3 {
+  font-size: 14px;
+  margin: 0 0 2px;
+}
+
+.spike-card p {
+  margin: 0;
+}
+
+.spike-status {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--sub);
+}
+
+.spike-status.ok {
+  color: #1a7f37;
+}
+
+.spike-status.bad {
+  color: var(--danger);
+}
+
+.spike-raw {
+  margin: 8px 0 0;
+  padding: 10px;
+  max-height: 220px;
+  overflow: auto;
+  background: color-mix(in srgb, var(--bg) 70%, var(--bubble-her));
+  border-radius: 6px;
+  font-size: 11px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.btn {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.btn.primary {
+  background: var(--bubble-me);
+  color: #10351c;
+  border-color: var(--bubble-me);
+  font-weight: 600;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ---------- 聊天壳 ---------- */
+.chat-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  position: relative;
+}
+
+.chat-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 52px;
+  padding: 0 14px;
+  background: var(--nav-bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.avatar {
+  width: var(--avatar);
+  height: var(--avatar);
+  border-radius: var(--radius-avatar);
+  border: 1px solid var(--border);
+}
+
+.chat-title {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+
+.chat-title strong {
+  font-size: 15px;
+}
+
+.chat-title span {
+  font-size: 11px;
+}
+
+.icon-btn {
+  margin-left: auto;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 18px;
+  border-radius: 6px;
+}
+
+.icon-btn:hover {
+  background: color-mix(in srgb, var(--bg) 60%, var(--bubble-her));
+}
+
+.chat-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.time-divider {
+  align-self: center;
+  color: var(--sub);
+  font-size: 11px;
+  background: color-mix(in srgb, var(--bg) 65%, var(--bubble-her));
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  max-width: 100%;
+}
+
+.row.me {
+  justify-content: flex-end;
+}
+
+.bubble-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-avatar);
+  background: color-mix(in srgb, var(--bubble-her) 70%, var(--border));
+  flex: 0 0 auto;
+}
+
+.bubble {
+  position: relative;
+  max-width: var(--bubble-max);
+  padding: 9px 12px;
+  border-radius: var(--radius);
+  font-size: var(--font-size);
+  line-height: var(--line-height);
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+.bubble.her {
+  background: var(--bubble-her);
+}
+
+.bubble.me {
+  background: var(--bubble-me);
+  color: #10351c;
+}
+
+.ai-badge {
+  position: absolute;
+  top: -7px;
+  right: -4px;
+  padding: 0 3px;
+  border-radius: 3px;
+  font-size: var(--ai-badge);
+  line-height: 12px;
+  color: var(--sub);
+  background: color-mix(in srgb, var(--bubble-her) 80%, var(--bg));
+  border: 1px solid var(--border);
+  letter-spacing: 0.3px;
+}
+
+.typing {
+  display: inline-flex;
+  gap: 4px;
+  padding: 12px 14px;
+  background: var(--bubble-her);
+  border-radius: var(--radius);
+  min-width: 52px;
+  justify-content: center;
+}
+
+.typing i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--sub);
+  animation: blink 1.2s infinite ease-in-out;
+}
+
+.typing i:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.typing i:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes blink {
+  0%,
+  60%,
+  100% {
+    opacity: 0.35;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+}
+
+.composer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: var(--composer-h);
+  padding: 0 12px;
+  background: var(--nav-bg);
+  border-top: 1px solid var(--border);
+}
+
+.composer .icon-btn {
+  margin-left: 0;
+}
+
+.composer-input {
+  flex: 1;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  background: var(--bubble-her);
+  border-radius: 6px;
+  color: var(--sub);
+  font-size: 13px;
+}
+
+.chat-caption {
+  position: absolute;
+  right: 12px;
+  bottom: calc(var(--composer-h) + 8px);
+  max-width: 380px;
+  text-align: right;
+  pointer-events: none;
+}
