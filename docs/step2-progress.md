@@ -7,7 +7,7 @@
 
 | 模块 | 内容 | 验证 |
 |---|---|---|
-| 导入适配器（5 种） | `wechatmsg_txt` / `wechatmsg_csv` / `liuhen_json` / `qq_txt` / `plaintext_paste`；CSV 引号解析、文件编码由 Rust 处理（UTF-8/GB18030） | `packages/core/test/import-pipeline.test.ts` 10 项全过 |
+| 导入适配器（6 种） | `wechatmsg_txt` / `wechatmsg_csv` / `liuhen_json` / `qq_txt` / `plaintext_paste` / `chatdata_js`；CSV 引号解析、文件编码由 Rust 处理（UTF-8/GB18030） | `packages/core/test/import-pipeline.test.ts` 10 项 + `chatdata-adapter.test.ts` 3 项全过 |
 | 导入流水线 | 嗅探→解析→归一化→跨文件去重→burst/latency 补全→holdout 切分→体检报告；全程纯 TS | 同上 |
 | holdout | 固定种子随机抽她的文字回复（默认 400，数据少按 5%、最少 20），`is_holdout=1` 入库 | 单测覆盖确定性 |
 | SQLCipher 数据层 | `db_init(ddl)`、`import_persist`、`db_stats`、`profile_save/load`、`media_persist`、`pick_import_files`；DB 位于 app data，整库加密 | `cargo test --lib` 4/4（含持久化/统计/资料 roundtrip） |

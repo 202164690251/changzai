@@ -36,6 +36,7 @@
 - `liuhen_json`：留痕导出的 JSON
 - `qq_txt`：QQ 导出 txt（可选）
 - `plaintext_paste`：直接粘贴（`时间 发送人: 内容` 每行一条）
+- `chatdata_js`：网页导出 `data.js`（`window.CHAT_DATA = [...]`，自动展开语音转写）
 
 ## 5. 导出后的自检清单
 
