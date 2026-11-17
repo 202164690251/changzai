@@ -249,8 +249,18 @@ export function ChatShell(): ReactElement {
   const proactive = useProactive({
     persona: persona.profile,
     llm: llm.config,
-    herName: displayName(profile.her, "ta"),
-    meName: displayName(profile.me, "我"),
+    herName,
+    meName,
+    relationship: relationship.profile,
+    styleCalibration: styleFeedback.calibration,
+    moodNote: emotion.moodNote,
+    recentMessages: messages
+      .filter((message) => message.kind === "text" && message.from !== "system")
+      .slice(-8)
+      .map((message) => ({
+        from: message.from === "her" ? ("her" as const) : ("me" as const),
+        text: message.kind === "text" ? message.text : "",
+      })),
     lastUserAt,
     onMessage: (text) => {
       appendProactive(text);
@@ -521,7 +531,7 @@ export function ChatShell(): ReactElement {
                 撤回
               </button>
             )}
-            {styleFeedback.enabled && messageMenu.message.from === "her" && messageMenu.message.kind === "text" && (
+            {messageMenu.message.from === "her" && messageMenu.message.kind === "text" && (
               <button
                 type="button"
                 onClick={() => {

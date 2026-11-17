@@ -28,6 +28,7 @@ export * from "./memory/index.ts";
 export * from "./safety/factGuard.ts";
 export * from "./runtime/prompt.ts";
 export * from "./runtime/filter.ts";
+export * from "./runtime/quality.ts";
 export * from "./runtime/decide.ts";
 export * from "./runtime/recall.ts";
 export * from "./runtime/proactive.ts";

@@ -840,7 +840,7 @@ export function SettingsDrawer({
             <p className="settings-hint">
               {proactiveState.desireLevel === "custom"
                 ? "自定义：时间和频率都按秒计算；上限填 0 表示不限制。"
-                : PROACTIVE_PRESETS[proactiveState.desireLevel].description}
+                : PROACTIVE_PRESETS[proactiveState.desireLevel]?.description ?? "自定义主动消息参数"}
             </p>
 
             <div className="media-actions">
