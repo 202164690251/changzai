@@ -724,6 +724,19 @@ export function SettingsDrawer({
                 />
               </label>
               <label className="settings-field">
+                <span className="field-label">连续未回上限（1–10）</span>
+                <input
+                  className="text-input"
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={proactiveState.noReplyLimit}
+                  onChange={(event) =>
+                    onUpdateProactive({ noReplyLimit: Number(event.target.value), desireLevel: "custom" })
+                  }
+                />
+              </label>
+              <label className="settings-field">
                 <span className="field-label">触发阈值（0.05–0.95）</span>
                 <input
                   className="text-input"

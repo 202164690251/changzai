@@ -25,6 +25,8 @@ export interface ProactiveState {
   checkIntervalMinutes: number;
   /** 触发阈值 0..1；越低越容易主动 */
   triggerThreshold: number;
+  /** 连续多少次主动没得到回复就停 */
+  noReplyLimit: number;
   sentToday: number;
   sentWeek: number;
   lastSentAt: number;
@@ -54,6 +56,7 @@ export interface ProactivePreset {
   activeStart: number;
   activeEnd: number;
   triggerThreshold: number;
+  noReplyLimit: number;
 }
 
 export const PROACTIVE_PRESETS: Record<Exclude<ProactiveDesire, "custom">, ProactivePreset> = {
@@ -71,6 +74,7 @@ export const PROACTIVE_PRESETS: Record<Exclude<ProactiveDesire, "custom">, Proac
     activeStart: 10,
     activeEnd: 22,
     triggerThreshold: 0.62,
+    noReplyLimit: 1,
   },
   medium: {
     id: "medium",
@@ -86,6 +90,7 @@ export const PROACTIVE_PRESETS: Record<Exclude<ProactiveDesire, "custom">, Proac
     activeStart: 9,
     activeEnd: 23,
     triggerThreshold: 0.45,
+    noReplyLimit: 2,
   },
   high: {
     id: "high",
@@ -101,6 +106,7 @@ export const PROACTIVE_PRESETS: Record<Exclude<ProactiveDesire, "custom">, Proac
     activeStart: 8,
     activeEnd: 24,
     triggerThreshold: 0.32,
+    noReplyLimit: 3,
   },
 };
 
@@ -165,6 +171,7 @@ export function normalizeProactiveState(state: ProactiveState, now: number): Pro
     minIdleMinutes: Math.round(clamp(state.minIdleMinutes, 5, 720)),
     checkIntervalMinutes: Math.round(clamp(state.checkIntervalMinutes, 1, 120)),
     triggerThreshold: clamp(state.triggerThreshold, 0.05, 0.95),
+    noReplyLimit: Math.round(clamp(state.noReplyLimit, 1, 10)),
     desireFactor: clamp(state.desireFactor, 0.1, 2),
     dndStart: Math.round(clamp(state.dndStart, 0, 23)),
     dndEnd: Math.round(clamp(state.dndEnd, 0, 23)),
@@ -219,7 +226,7 @@ export function planProactive(
   if (idleMinutes < minIdle) {
     return { shouldSend: false, reason: `刚聊过，再等等（${Math.round(idleMinutes)} 分钟）`, desire, opportunity, score };
   }
-  if (state.consecutiveNoReply >= 2) {
+  if (state.consecutiveNoReply >= state.noReplyLimit) {
     return { shouldSend: false, reason: "对方连续没回，先停一停", desire, opportunity, score };
   }
   if (score < state.triggerThreshold) {
