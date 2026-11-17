@@ -98,6 +98,11 @@ powershell -ExecutionPolicy Bypass -File scripts\build.ps1   # Windows 安装包
 | Step 3 人格卡 | ✅ 风格卡/事实/参考对话/边界，8 项单测；holdout 自动排除 |
 | Step 3 模型接入 | ✅ OpenAI 兼容配置；API Key 存 SQLCipher；Rust SSE 流式回复 |
 | Step 3 聊天 | ✅ 已接入真实模型（无配置/无记录时保留演示回复） |
+| Step 4 情绪引擎 | ✅ 四轴状态 + 衰减 + 单轮硬限 + 8 类刺激 + 四类 Arc |
+| Step 4 Comfort Governor | ✅ 危机/依恋上限/脆弱/正常；归因/上限/出口 |
+| Step 4 记忆 | ✅ FTS5 memory_rebuild/search + L0–L3 四层装配（<3000 字符） |
+| Step 4 事实锁 | ✅ 20 条对抗样例全部拦截 |
+| Step 4 本地统计 | ✅ 设置页可查看/清空；只存本机 |
 | 技术自检面板 | ✅ 从主界面移除；`#/dev` 或 Ctrl+Shift+D 进入开发页 |
 | 多端（iOS/Android） | ⏳ 本期不做（架构已保留） |
 
@@ -124,11 +129,11 @@ git switch -c feat/your-task
 4. 数据格式带 `schema_version`，迁移可重放；
 5. 调度（纯逻辑）与投递（平台实现）分离。
 
-## 接下来（Step 3 收尾 / Step 4）
+## 接下来（Step 4 收尾 / Step 5）
 
-1. 情绪标注 + Kappa 校准；人格卡审阅与逐条事实确认；
-2. Correction 层（用户纠正「ta 不会这样说」）；holdout 黄金集回归；
-3. 流式停止/重试/上下文管理；多模型切换与费用提示；
-4. 真实数据下的 5 万条性能与首次盲测。
+1. 情绪标注 + Kappa 校准；转移矩阵用真实数据拟合；
+2. 记忆向量检索/LLM 重排；open_loop 落表与跨会话生命周期；
+3. Arc 四类场次回放验收；Governor 阈值调优；
+4. 对话运行时/主动消息/模型路由（Step 5）；真实 5 万条性能与盲测。
 
-> Step 2 进度见 [docs/step2-progress.md](docs/step2-progress.md)；Step 3 进度与手动测试见 [docs/step3-progress.md](docs/step3-progress.md)。
+> Step 2/3/4 进度见 [docs/step2-progress.md](docs/step2-progress.md)、[docs/step3-progress.md](docs/step3-progress.md)、[docs/step4-progress.md](docs/step4-progress.md)。

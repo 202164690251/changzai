@@ -578,6 +578,173 @@ pub fn persona_load(app: tauri::AppHandle) -> Result<Option<serde_json::Value>, 
     serde_json::from_str(&raw).map(Some).map_err(|e| e.to_string())
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MemoryHit {
+    pub id: String,
+    pub text: String,
+    pub ts: i64,
+    pub importance: f64,
+    pub valence: Option<f64>,
+    pub score: f64,
+}
+
+fn memory_rebuild_at(dir: &Path) -> Result<i64, String> {
+    let mut conn = open_at(dir)?;
+    if !table_exists(&conn, "memory")? {
+        return Err("数据库尚未初始化".to_string());
+    }
+    let rows: Vec<(String, String, String, i64)> = {
+        let mut statement = conn
+            .prepare(
+                "SELECT id, sender, content, ts FROM message
+                 WHERE is_holdout = 0 AND type = 'text' AND length(content) >= 2
+                 ORDER BY ts ASC LIMIT 20000",
+            )
+            .map_err(|e| e.to_string())?;
+        let mapped = statement
+            .query_map([], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, i64>(3)?,
+                ))
+            })
+            .map_err(|e| e.to_string())?;
+        let mut out = Vec::new();
+        for row in mapped {
+            out.push(row.map_err(|e| e.to_string())?);
+        }
+        out
+    };
+
+    let tx = conn.transaction().map_err(|e| e.to_string())?;
+    tx.execute("DELETE FROM memory WHERE persona_id = 'persona_default'", [])
+        .map_err(|e| e.to_string())?;
+    let mut inserted = 0i64;
+    for (id, sender, content, ts) in rows {
+        let text = if sender == "her" {
+            content
+        } else {
+            format!("我：{content}")
+        };
+        let importance = (0.4 + (text.chars().count() as f64) / 200.0).min(0.95);
+        tx.execute(
+            "INSERT OR REPLACE INTO memory(
+                id, persona_id, episode_id, text, emotion_valence, emotion_tag,
+                importance, last_access_ts, access_count
+             ) VALUES (?1, 'persona_default', NULL, ?2, NULL, NULL, ?3, ?4, 0)",
+            params![format!("mem_{id}"), text, importance, ts],
+        )
+        .map_err(|e| e.to_string())?;
+        inserted += 1;
+    }
+    tx.commit().map_err(|e| e.to_string())?;
+    Ok(inserted)
+}
+
+fn memory_search_at(dir: &Path, query: &str, limit: usize) -> Result<Vec<MemoryHit>, String> {
+    let conn = open_at(dir)?;
+    if !table_exists(&conn, "memory")? {
+        return Ok(Vec::new());
+    }
+    let limit = limit.clamp(1, 50) as i64;
+    let q = query.trim();
+    if q.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    // trigram FTS5 对 <3 字符的查询无结果，短查询走 LIKE
+    if q.chars().count() >= 3 {
+        let fts_query = format!("\"{}\"", q.replace('"', "\"\""));
+        let result = (|| -> Result<Vec<MemoryHit>, rusqlite::Error> {
+            let mut statement = conn.prepare(
+                "SELECT m.id, m.text, m.last_access_ts, m.importance, m.emotion_valence,
+                        bm25(memory_fts) AS rank
+                 FROM memory_fts
+                 JOIN memory m ON m.rowid = memory_fts.rowid
+                 WHERE memory_fts MATCH ?1
+                 ORDER BY rank
+                 LIMIT ?2",
+            )?;
+            let rows = statement.query_map(params![fts_query, limit], |row| {
+                Ok(MemoryHit {
+                    id: row.get(0)?,
+                    text: row.get(1)?,
+                    ts: row.get::<_, Option<i64>>(2)?.unwrap_or(0),
+                    importance: row.get::<_, Option<f64>>(3)?.unwrap_or(0.5),
+                    valence: row.get(4)?,
+                    score: -row.get::<_, f64>(5)?,
+                })
+            })?;
+            let mut out = Vec::new();
+            for row in rows {
+                out.push(row?);
+            }
+            Ok(out)
+        })();
+        if let Ok(hits) = result {
+            if !hits.is_empty() {
+                return Ok(hits);
+            }
+        }
+    }
+
+    let pattern = format!("%{q}%");
+    let mut statement = conn
+        .prepare(
+            "SELECT id, text, last_access_ts, importance, emotion_valence
+             FROM memory WHERE text LIKE ?1
+             ORDER BY importance DESC LIMIT ?2",
+        )
+        .map_err(|e| e.to_string())?;
+    let rows = statement
+        .query_map(params![pattern, limit], |row| {
+            Ok(MemoryHit {
+                id: row.get(0)?,
+                text: row.get(1)?,
+                ts: row.get::<_, Option<i64>>(2)?.unwrap_or(0),
+                importance: row.get::<_, Option<f64>>(3)?.unwrap_or(0.5),
+                valence: row.get(4)?,
+                score: 0.5,
+            })
+        })
+        .map_err(|e| e.to_string())?;
+    let mut out = Vec::new();
+    for row in rows {
+        out.push(row.map_err(|e| e.to_string())?);
+    }
+    Ok(out)
+}
+
+fn memory_count_at(dir: &Path) -> Result<i64, String> {
+    let conn = open_at(dir)?;
+    if !table_exists(&conn, "memory")? {
+        return Ok(0);
+    }
+    conn.query_row("SELECT count(*) FROM memory", [], |row| row.get(0))
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn memory_rebuild(app: tauri::AppHandle) -> Result<i64, String> {
+    let dir = app_dir(&app)?;
+    memory_rebuild_at(&dir)
+}
+
+#[tauri::command]
+pub fn memory_search(app: tauri::AppHandle, query: String, limit: Option<usize>) -> Result<Vec<MemoryHit>, String> {
+    let dir = app_dir(&app)?;
+    memory_search_at(&dir, &query, limit.unwrap_or(20))
+}
+
+#[tauri::command]
+pub fn memory_count(app: tauri::AppHandle) -> Result<i64, String> {
+    let dir = app_dir(&app)?;
+    memory_count_at(&dir)
+}
+
 #[tauri::command]
 pub fn messages_load(app: tauri::AppHandle, limit: Option<usize>) -> Result<Vec<ImportMessage>, String> {
     let dir = app_dir(&app)?;
@@ -694,6 +861,14 @@ mod tests {
           id TEXT PRIMARY KEY, persona_id TEXT, msg_id TEXT, kind TEXT, path TEXT, mime TEXT,
           bytes INTEGER, duration_ms INTEGER, created_at INTEGER
         );
+        CREATE TABLE IF NOT EXISTS memory(
+          id TEXT PRIMARY KEY, persona_id TEXT, episode_id TEXT, text TEXT,
+          emotion_valence REAL, emotion_tag TEXT, importance REAL,
+          last_access_ts INTEGER, access_count INTEGER
+        );
+        CREATE VIRTUAL TABLE IF NOT EXISTS memory_fts USING fts5(
+          text, content='memory', content_rowid='rowid', tokenize='trigram'
+        );
     ";
 
     fn temp_dir(name: &str) -> PathBuf {
@@ -787,6 +962,13 @@ mod tests {
         let loaded_messages = messages_load_at(&dir, 100).expect("messages load");
         assert_eq!(loaded_messages.len(), 10);
         assert_eq!(loaded_messages[0].id, "m_0");
+
+        // Step 4：记忆重建 / FTS5 检索
+        let rebuilt = memory_rebuild_at(&dir).expect("memory rebuild");
+        assert_eq!(rebuilt, 9); // holdout 消息不进入记忆
+        assert_eq!(memory_count_at(&dir).expect("memory count"), 9);
+        let hits = memory_search_at(&dir, "第", 5).expect("memory search");
+        assert!(!hits.is_empty());
 
         let _ = fs::remove_dir_all(&dir);
     }

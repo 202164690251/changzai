@@ -1,5 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { buildChatMessages, type PersonaProfile } from "@changzai/core";
+import {
+  applyStimulus,
+  assessAndDecide,
+  buildRuntimeMessages,
+  classifyStimulus,
+  decayEmotion,
+  determineScene,
+  detectOpenLoops,
+  guardUserMessage,
+  planArc,
+  retrieveMemories,
+  type EmotionState,
+  type MemoryCandidate,
+  type PersonaProfile,
+} from "@changzai/core";
 import { DEMO_VOICE_SECONDS, demoImageDataUrl, demoVoiceDataUrl } from "../lib/demoMedia.ts";
 import { formatTimeDivider } from "../lib/time.ts";
 import { api, type ImportedMediaFile, type LlmConfig } from "../lib/tauri.ts";
@@ -79,6 +93,9 @@ export interface ChatOptions {
   llm: LlmConfig | null;
   herName: string;
   meName: string;
+  /** Step 4：当前情绪状态（由 useEmotion 持久化） */
+  emotion: EmotionState;
+  onEmotion: (state: EmotionState) => void;
   /** 无法回复 / 配置缺失时的提示 */
   onNotice?: (text: string) => void;
 }
@@ -153,50 +170,95 @@ export function useChat(options: ChatOptions): ChatApi {
       if (!persona || !llm) return;
       clearReplyTimer();
       setTyping(true);
-      const payload = buildChatMessages(
-        persona,
-        history
-          .filter((message): message is TextMessage => message.kind === "text" && message.id.startsWith("msg-") && message.from !== "system")
-          .map((message) => ({ from: message.from === "her" ? "her" : "me", text: message.text })),
-        userText,
-        { name: options.herName, selfName: options.meName },
-      );
+
+      const now = Date.now();
+      const decayed = decayEmotion(options.emotion, now);
+      const runtimeHistory = history
+        .filter(
+          (message): message is TextMessage =>
+            message.kind === "text" && message.id.startsWith("msg-") && message.from !== "system",
+        )
+        .map((message) => ({
+          from: message.from === "her" ? ("her" as const) : ("me" as const),
+          text: message.text,
+          ts: message.ts,
+        }));
+      const governorMessages = [...runtimeHistory, { from: "me" as const, text: userText, ts: now }];
+      const governor = assessAndDecide(governorMessages, now);
+      if (governor.exitText) options.onNotice?.(governor.exitText);
+
+      const arc = planArc(determineScene(userText, new Date(now).getHours()), userText);
+      const guard = guardUserMessage(userText);
+      const intensity = Math.min(1, Math.max(0.2, userText.length / 40));
+      const nextEmotion = applyStimulus(decayed, classifyStimulus(userText), intensity, now);
+      options.onEmotion(nextEmotion);
+
       const replyId = nextId();
       let started = false;
-      void api
-        .llmChatStream(
-          payload.map((message) => ({ role: message.role, content: message.content })),
-          (event) => {
-            if (event.kind === "delta" && event.text.length > 0) {
-              setTyping(false);
-              if (!started) {
-                started = true;
-                setMessages((previous) => [
-                  ...previous,
-                  { id: replyId, from: "her", kind: "text", text: event.text, ts: Date.now() },
-                ]);
-              } else {
-                setMessages((previous) =>
-                  previous.map((message) =>
-                    message.id === replyId && message.kind === "text"
-                      ? { ...message, text: message.text + event.text }
-                      : message,
-                  ),
-                );
-              }
-            } else if (event.kind === "error") {
-              setTyping(false);
-              options.onNotice?.(event.text);
-            } else if (event.kind === "done") {
-              setTyping(false);
-              if (!started) options.onNotice?.("模型没有返回内容，请检查模型名或额度");
-            }
-          },
-        )
-        .catch((error: unknown) => {
-          setTyping(false);
-          options.onNotice?.(error instanceof Error ? error.message : String(error));
+      void (async () => {
+        let memories: ReturnType<typeof retrieveMemories> = [];
+        try {
+          const hits = await api.memorySearch(userText, 20);
+          const candidates: MemoryCandidate[] = hits.map((hit) => ({
+            id: hit.id,
+            text: hit.text,
+            ts: hit.ts,
+            importance: hit.importance,
+            valence: hit.valence,
+          }));
+          memories = retrieveMemories(candidates, userText, nextEmotion, { topK: 5, now });
+        } catch {
+          /* 记忆不可用时退化为无记忆 */
+        }
+        const runtime = buildRuntimeMessages({
+          persona,
+          emotion: nextEmotion,
+          arc,
+          governor,
+          guard,
+          memories,
+          openLoops: detectOpenLoops(governorMessages.slice(-50), now),
+          summary: persona.summary,
+          history: runtimeHistory,
+          userText,
+          profile: { name: options.herName, selfName: options.meName },
         });
+
+        await api
+          .llmChatStream(
+            runtime.messages.map((message) => ({ role: message.role, content: message.content })),
+            (event) => {
+              if (event.kind === "delta" && event.text.length > 0) {
+                setTyping(false);
+                if (!started) {
+                  started = true;
+                  setMessages((previous) => [
+                    ...previous,
+                    { id: replyId, from: "her", kind: "text", text: event.text, ts: Date.now() },
+                  ]);
+                } else {
+                  setMessages((previous) =>
+                    previous.map((message) =>
+                      message.id === replyId && message.kind === "text"
+                        ? { ...message, text: message.text + event.text }
+                        : message,
+                    ),
+                  );
+                }
+              } else if (event.kind === "error") {
+                setTyping(false);
+                options.onNotice?.(event.text);
+              } else if (event.kind === "done") {
+                setTyping(false);
+                if (!started) options.onNotice?.("模型没有返回内容，请检查模型名或额度");
+              }
+            },
+          )
+          .catch((error: unknown) => {
+            setTyping(false);
+            options.onNotice?.(error instanceof Error ? error.message : String(error));
+          });
+      })();
     },
     [clearReplyTimer, nextId, options],
   );

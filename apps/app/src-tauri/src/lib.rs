@@ -79,6 +79,9 @@ pub fn run() {
             store::persona_save,
             store::persona_load,
             store::messages_load,
+            store::memory_rebuild,
+            store::memory_search,
+            store::memory_count,
             llm::llm_config_load,
             llm::llm_config_save,
             llm::llm_chat_stream

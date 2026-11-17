@@ -168,6 +168,15 @@ export interface LlmChatEvent {
   text: string;
 }
 
+export interface MemoryHit {
+  id: string;
+  text: string;
+  ts: number;
+  importance: number;
+  valence: number | null;
+  score: number;
+}
+
 export function isTauri(): boolean {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }
@@ -292,6 +301,28 @@ export const api = {
   async messagesLoad(limit?: number): Promise<ImportMessageRow[]> {
     requireTauri();
     return invoke<ImportMessageRow[]>("messages_load", { limit: limit ?? null });
+  },
+  /** Step 4：通用 setting 读写（情绪状态/统计事件等） */
+  async settingGet(key: string): Promise<string | null> {
+    requireTauri();
+    return invoke<string | null>("setting_get", { key });
+  },
+  async settingSet(key: string, value: string): Promise<boolean> {
+    requireTauri();
+    return invoke<boolean>("setting_set", { key, value });
+  },
+  /** Step 4：记忆重建 / 检索（SQLite memory + FTS5 trigram） */
+  async memoryRebuild(): Promise<number> {
+    requireTauri();
+    return invoke<number>("memory_rebuild");
+  },
+  async memorySearch(query: string, limit = 20): Promise<MemoryHit[]> {
+    requireTauri();
+    return invoke<MemoryHit[]>("memory_search", { query, limit });
+  },
+  async memoryCount(): Promise<number> {
+    requireTauri();
+    return invoke<number>("memory_count");
   },
   /** Step 3：流式对话；onEvent 先于 Promise resolve 收到 delta */
   async llmChatStream(
