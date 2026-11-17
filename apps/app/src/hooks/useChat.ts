@@ -122,6 +122,7 @@ export interface ChatApi {
   sendImage: (dataUrl: string, name?: string) => void;
   appendImported: (files: ImportedMediaFile[]) => void;
   appendProactive: (text: string) => void;
+  resetToGreeting: (text: string) => Promise<void>;
   recallLastMessage: () => boolean;
   deleteMessage: (id: string) => void;
   clear: () => void;
@@ -531,6 +532,25 @@ export function useChat(options: ChatOptions): ChatApi {
     [clearReplyTimer, nextId, persistMessage],
   );
 
+  const resetToGreeting = useCallback(
+    async (text: string): Promise<void> => {
+      clearReplyTimer();
+      setTyping(false);
+      if (isTauri()) await api.chatClear().catch(() => undefined);
+      const message: ChatMsg = { id: nextId(), from: "her", kind: "text", text, ts: Date.now() };
+      conversationRef.current = { summary: "", topic: "", turns: 0 };
+      if (isTauri()) {
+        await api
+          .settingSet("conversation.state", JSON.stringify({ summary: "", topic: "", turns: 0 }))
+          .catch(() => undefined);
+      }
+      setMessages([message]);
+      setUnread(1);
+      persistMessage(message);
+    },
+    [clearReplyTimer, nextId, persistMessage],
+  );
+
   const clear = useCallback(() => {
     clearReplyTimer();
     setTyping(false);
@@ -553,6 +573,7 @@ export function useChat(options: ChatOptions): ChatApi {
       sendImage,
       appendImported,
       appendProactive,
+      resetToGreeting,
       recallLastMessage,
       deleteMessage,
       clear,
@@ -566,6 +587,7 @@ export function useChat(options: ChatOptions): ChatApi {
       sendImage,
       appendImported,
       appendProactive,
+      resetToGreeting,
       recallLastMessage,
       deleteMessage,
       clear,
