@@ -127,7 +127,7 @@ export function useProactive(options: ProactiveOptions): ProactiveApi {
       if (!text) return;
       onMessage(text);
       void notify(herName, text);
-      persist(recordProactiveSent(stateRef.current, Date.now()));
+      persist({ ...recordProactiveSent(stateRef.current, Date.now()), lastUserAt: Date.now() });
     } catch (err) {
       onNotice(err instanceof Error ? err.message : String(err));
     } finally {
