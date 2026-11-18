@@ -6,6 +6,7 @@ import type { VoiceSettings } from "../hooks/useConversations.ts";
 import { readAvatarFile } from "../lib/avatar.ts";
 import { MAX_NAME_LENGTH, displayName, type PersonKey, type Profile } from "../lib/profile.ts";
 import { api, isTauri, type DbStats, type LlmConfig, type MediaKind, type TtsVoice } from "../lib/tauri.ts";
+import type { ConversationImportStats } from "../hooks/useConversations.ts";
 import { Avatar } from "./Avatar.tsx";
 import { Icon } from "./Icons.tsx";
 
@@ -78,6 +79,8 @@ export interface SettingsDrawerProps {
   onTogglePet: () => void;
   petImage: string | null;
   onPetImageChange: (dataUrl: string | null) => void;
+  conversationStats: ConversationImportStats | null;
+  legacyUnscoped: boolean;
 }
 
 /** 设置抽屉：双方昵称/头像、回忆素材导入、使用说明。 */
@@ -149,6 +152,8 @@ export function SettingsDrawer({
   onTogglePet,
   petImage,
   onPetImageChange,
+  conversationStats,
+  legacyUnscoped,
 }: SettingsDrawerProps): ReactElement {
   const herInputRef = useRef<HTMLInputElement | null>(null);
   const meInputRef = useRef<HTMLInputElement | null>(null);
@@ -311,14 +316,27 @@ export function SettingsDrawer({
               导入你和{herName}的微信聊天记录（txt / csv / json），会自动生成体检报告并加密保存在本机。
             </p>
             {dbError !== null && <p className="settings-warn">{dbError}</p>}
-            {dbReady && dbStats?.ok ? (
+            {conversationStats ? (
               <p className="settings-note">
-                已导入 {dbStats.messageCount.toLocaleString("zh-CN")} 条消息（ta 的{" "}
-                {dbStats.herCount.toLocaleString("zh-CN")} 条，holdout {dbStats.holdoutCount} 条），跨度{" "}
-                {dbStats.spanDays} 天。
+                本聊天：{conversationStats.messages.toLocaleString("zh-CN")} 条消息（ta 的{" "}
+                {conversationStats.herMessages.toLocaleString("zh-CN")} 条
+                {conversationStats.holdout ? `，holdout ${conversationStats.holdout} 条` : ""}），跨度{" "}
+                {conversationStats.spanDays} 天。
               </p>
             ) : (
-              <p className="settings-note">{dbReady ? "还没有导入聊天记录。" : "正在初始化本地数据库…"}</p>
+              <p className="settings-note">
+                {dbReady ? "这个聊天还没有自己的导入记录。" : "正在初始化本地数据库…"}
+              </p>
+            )}
+            {legacyUnscoped && (
+              <p className="settings-warn">
+                这是旧版导入，聊天记录没有绑定到具体聊天。请重新导入对应联系人的记录，避免和其他聊天混在一起。
+              </p>
+            )}
+            {dbReady && dbStats?.ok && dbStats.messageCount > 0 && (
+              <p className="settings-hint">
+                本机数据库总计 {dbStats.messageCount.toLocaleString("zh-CN")} 条，仅作存储统计，不参与当前聊天的“翻一翻”。
+              </p>
             )}
             <div className="media-actions">
               <button type="button" className="btn primary" disabled={!dbReady} onClick={onOpenImport}>

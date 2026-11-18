@@ -118,6 +118,8 @@ export interface ChatOptions {
   dbReady?: boolean;
   /** 当前会话 id；消息 payload 里也会带 convId */
   conversationId?: string;
+  /** 记忆检索命名空间；通常等于 session 的 importId */
+  memoryScope?: string;
   relationship?: RelationshipProfile | null;
   styleCalibration?: string;
   moodNote?: string;
@@ -362,18 +364,20 @@ export function useChat(options: ChatOptions): ChatApi {
         let memories: ReturnType<typeof retrieveMemories> = [];
         const conversation = conversationRef.current;
         const memoryQuery = [conversation.topic, userText].filter(Boolean).join(" ");
-        try {
-          const hits = await api.memorySearch(memoryQuery, 20);
-          const candidates: MemoryCandidate[] = hits.map((hit) => ({
-            id: hit.id,
-            text: hit.text,
-            ts: hit.ts,
-            importance: hit.importance,
-            valence: hit.valence,
-          }));
-          memories = retrieveMemories(candidates, memoryQuery, nextEmotion, { topK: 5, now });
-        } catch {
-          /* 记忆不可用时退化为无记忆 */
+        if (options.memoryScope) {
+          try {
+            const hits = await api.memorySearch(memoryQuery, 20, options.memoryScope);
+            const candidates: MemoryCandidate[] = hits.map((hit) => ({
+              id: hit.id,
+              text: hit.text,
+              ts: hit.ts,
+              importance: hit.importance,
+              valence: hit.valence,
+            }));
+            memories = retrieveMemories(candidates, memoryQuery, nextEmotion, { topK: 5, now });
+          } catch {
+            /* 记忆不可用时退化为无记忆 */
+          }
         }
         const runtime = buildComposedMessages({
           persona,

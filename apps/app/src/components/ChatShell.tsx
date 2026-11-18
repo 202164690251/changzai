@@ -80,6 +80,29 @@ export function ChatShell(): ReactElement {
   const { toast, show } = useToast();
   const conversations = useConversations(db.ready);
   const activeConversation = conversations.active;
+  const conversationImportStats =
+    activeConversation?.importStats ??
+    (activeConversation?.importId
+      ? activeConversation.importId === "conv_default" && db.stats?.ok
+        ? {
+            messages: db.stats.messageCount,
+            herMessages: db.stats.herCount,
+            holdout: db.stats.holdoutCount,
+            spanDays: db.stats.spanDays,
+            importedAt: activeConversation.persona.built_at,
+          }
+        : {
+            messages: activeConversation.persona.source.messages,
+            herMessages: activeConversation.persona.source.her_messages,
+            spanDays: activeConversation.persona.source.span_days,
+            importedAt: activeConversation.persona.built_at,
+          }
+      : null);
+  const legacyUnscoped = Boolean(
+    activeConversation &&
+      !activeConversation.importId &&
+      activeConversation.persona.source.messages > 0,
+  );
   const herName = activeConversation?.herName ?? displayName(profile.her, "ta");
   const herAvatar = activeConversation?.herAvatar ?? profile.her.avatar;
   const meName = displayName(profile.me, "我");
@@ -457,7 +480,7 @@ export function ChatShell(): ReactElement {
     [activeConversation?.id, clear, conversations, deleteConversationMessages, persona, relationship, show],
   );
 
-  const importer = useImport(async (result) => {
+  const importer = useImport(async (result, importId) => {
     await db.refresh();
     await persona.buildFromImport(result.messages);
     const importedProfile = (await api.personaLoad()) as PersonaProfile | null;
@@ -490,8 +513,8 @@ export function ChatShell(): ReactElement {
       setPersonaStartOpen(false);
       await onboarding.complete();
     }
-    if (!relationship.profile) void relationship.rebuild();
-    void api.memoryRebuild().catch(() => undefined);
+    if (!relationship.profile) void relationship.rebuild(importId);
+    void api.memoryRebuild(importId).catch(() => undefined);
     analytics.log("import_done");
     show("人格卡已生成，可以在设置里查看");
   });
@@ -516,15 +539,17 @@ export function ChatShell(): ReactElement {
   // 已有消息但记忆为空时（老版本升级）自动重建一次
   useEffect(() => {
     if (!db.ready || !db.stats?.ok || db.stats.messageCount === 0) return;
+    const scope = activeConversation?.importId;
+    if (!scope) return;
     void (async () => {
       try {
-        const count = await api.memoryCount();
-        if (count === 0) await api.memoryRebuild();
+        const count = await api.memoryCount(scope);
+        if (count === 0) await api.memoryRebuild(scope);
       } catch {
         /* 记忆不可用不影响聊天 */
       }
     })();
-  }, [db.ready, db.stats?.messageCount]);
+  }, [activeConversation?.importId, db.ready, db.stats?.messageCount]);
 
   const openImport = useCallback(() => {
     importer.reset();
@@ -1032,7 +1057,7 @@ export function ChatShell(): ReactElement {
           personaBusy={persona.busy}
           personaMessage={persona.message}
           onRebuildPersona={() => {
-            void persona.rebuildFromDb();
+            void persona.rebuildFromDb(activeConversation?.importId);
           }}
           emotion={emotion.effective}
           relationship={relationship.profile}
@@ -1042,7 +1067,7 @@ export function ChatShell(): ReactElement {
             void relationship.save(next);
           }}
           onRebuildRelationship={() => {
-            void relationship.rebuild();
+            void relationship.rebuild(activeConversation?.importId);
           }}
           styleReviewEnabled={styleFeedback.enabled}
           styleFeedbackCount={styleFeedback.feedback.length}
@@ -1056,6 +1081,8 @@ export function ChatShell(): ReactElement {
           }}
           petImage={activeConversation?.petImage ?? null}
           onPetImageChange={handlePetImageChange}
+          conversationStats={conversationImportStats}
+          legacyUnscoped={legacyUnscoped}
           analyticsCounts={analytics.counts}
           analyticsTotal={analytics.total}
           onClearAnalytics={analytics.clear}

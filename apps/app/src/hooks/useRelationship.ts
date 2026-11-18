@@ -27,7 +27,7 @@ export interface RelationshipApi {
   busy: boolean;
   message: string | null;
   save: (profile: RelationshipProfile) => Promise<void>;
-  rebuild: () => Promise<void>;
+  rebuild: (scope?: string | null) => Promise<void>;
   replace: (profile: RelationshipProfile) => void;
 }
 
@@ -74,12 +74,16 @@ export function useRelationship(herName: string, meName: string, dbReady = true)
     }
   }, []);
 
-  const rebuild = useCallback(async (): Promise<void> => {
+  const rebuild = useCallback(async (scope?: string | null): Promise<void> => {
     if (!isTauri()) return;
+    if (!scope) {
+      setMessage("当前聊天没有绑定导入记录，无法生成关系卡。");
+      return;
+    }
     setBusy(true);
-    setMessage("正在从聊天记录整理关系与称呼…");
+    setMessage("正在从本聊天的记录整理关系与称呼…");
     try {
-      const rows = await api.messagesLoad(50_000);
+      const rows = await api.messagesLoad(50_000, scope);
       if (rows.length === 0) {
         setMessage("还没有导入聊天记录，无法生成关系卡。");
         return;

@@ -19,7 +19,7 @@ export interface PersonaApi {
   /** 导入完成后，用本次解析出的消息生成并保存 */
   buildFromImport: (messages: PersonaSourceMessage[]) => Promise<void>;
   /** 从数据库已有消息重建（设置页手动触发） */
-  rebuildFromDb: () => Promise<void>;
+  rebuildFromDb: (scope?: string | null) => Promise<void>;
   /** 审阅：保存编辑后的事实列表 */
   updateFacts: (facts: PersonaProfile["facts"]) => Promise<void>;
   updateProfile: (patch: Partial<PersonaProfile>) => Promise<void>;
@@ -110,19 +110,23 @@ export function usePersona(): PersonaApi {
     [persist],
   );
 
-  const rebuildFromDb = useCallback(async (): Promise<void> => {
+  const rebuildFromDb = useCallback(async (scope?: string | null): Promise<void> => {
     if (!isTauri()) return;
+    if (!scope) {
+      setMessage("当前聊天没有绑定导入记录，请先重新导入这个联系人的聊天记录。");
+      return;
+    }
     setBusy(true);
-    setMessage("正在读取消息并重建人格卡…");
+    setMessage("正在读取本聊天的消息并重建人格卡…");
     try {
-      const rows = await api.messagesLoad(50_000);
+      const rows = await api.messagesLoad(50_000, scope);
       if (rows.length === 0) {
         setMessage("数据库里还没有消息，请先导入聊天记录");
         return;
       }
       const next = buildPersonaProfile(rows.map(rowToSource), { now: Date.now() });
       await persist(next);
-      setMessage(`人格卡已重建：${next.source.her_messages} 条 ta 的消息`);
+      setMessage(`人格卡已重建：${next.source.her_messages} 条 ta 的消息（仅本聊天）`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "重建失败");
     } finally {

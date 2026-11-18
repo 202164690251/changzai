@@ -26,10 +26,11 @@ const INITIAL: ImportState = {
   saved: false,
 };
 
-function toRows(result: ImportResult): ImportMessageRow[] {
+function toRows(result: ImportResult, importId: string): ImportMessageRow[] {
   return result.messages.map((message) => ({
-    id: message.msg_id,
-    convId: message.conv_id,
+    // 每次导入用独立命名空间，避免不同聊天/不同人的消息互相覆盖
+    id: `${importId}:${message.msg_id}`,
+    convId: importId,
     ts: message.ts,
     sender: message.sender,
     type: message.type,
@@ -43,7 +44,9 @@ function toRows(result: ImportResult): ImportMessageRow[] {
   }));
 }
 
-export function useImport(onSaved: (result: ImportResult) => Promise<void>): ImportApi {
+export function useImport(
+  onSaved: (result: ImportResult, importId: string) => Promise<void>,
+): ImportApi {
   const [state, setState] = useState<ImportState>(INITIAL);
   const canImport = isTauri();
 
@@ -53,6 +56,7 @@ export function useImport(onSaved: (result: ImportResult) => Promise<void>): Imp
         return;
       }
       void (async () => {
+        const importId = `import-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
         setState({ step: "picking", message: "正在选择文件…", result: null, saved: false });
         try {
           const picked = await api.pickImportFiles();
@@ -89,7 +93,7 @@ export function useImport(onSaved: (result: ImportResult) => Promise<void>): Imp
           });
           const persisted = await api.importPersist({
             sourceNames: picked.files.map((file) => file.name),
-            messages: toRows(result),
+            messages: toRows(result, importId),
             report: result.report,
           });
           if (!persisted.ok) {
@@ -102,7 +106,7 @@ export function useImport(onSaved: (result: ImportResult) => Promise<void>): Imp
             return;
           }
           setState({ step: "done", message: "", result, saved: true });
-          await onSaved(result);
+          await onSaved(result, importId);
         } catch (error) {
           setState({
             step: "error",
