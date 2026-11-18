@@ -514,11 +514,17 @@ export function useChat(options: ChatOptions): ChatApi {
         ts: Date.now(),
       };
       setMessages((previous) => previous.map((item) => (item.id === id && item.kind === "text" ? message : item)));
-      deletePersisted(id);
-      persistMessage(message);
+      if (isTauri()) {
+        void (async () => {
+          await api.chatDelete(id).catch(() => undefined);
+          await api
+            .chatAppend(message.id, message.ts, JSON.stringify({ ...message, convId: conversationId }))
+            .catch(() => undefined);
+        })();
+      }
       setUnread((previous) => previous + 1);
     },
-    [deletePersisted, persistMessage],
+    [conversationId],
   );
 
   const sendImage = useCallback(
