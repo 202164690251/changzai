@@ -1282,6 +1282,7 @@ export function SettingsDrawer({
       />
       <PetImageCrop
         source={petCropSource}
+        allowCutout
         onCancel={() => setPetCropSource(null)}
         onApply={(dataUrl) => {
           onPetImageChange(dataUrl);
