@@ -146,6 +146,7 @@ export function SettingsDrawer({
   const meInputRef = useRef<HTMLInputElement | null>(null);
   const [avatarError, setAvatarError] = useState<string | null>(null);
   const [ttsVoices, setTtsVoices] = useState<TtsVoice[]>([]);
+  const [ttsLoading, setTtsLoading] = useState(false);
   const [provider, setProvider] = useState(llmConfig.provider);
   const [baseUrl, setBaseUrl] = useState(llmConfig.baseUrl);
   const [model, setModel] = useState(llmConfig.model);
@@ -181,20 +182,6 @@ export function SettingsDrawer({
     setRelationFacts(relationship.userFacts.join("\n"));
     setRelationNotes(relationship.notes);
   }, [relationship]);
-
-  useEffect(() => {
-    if (!isTauri()) return;
-    let alive = true;
-    void api
-      .ttsVoices()
-      .then((voices) => {
-        if (alive) setTtsVoices(voices);
-      })
-      .catch(() => undefined);
-    return () => {
-      alive = false;
-    };
-  }, []);
 
   useEffect(() => {
     setProvider(llmConfig.provider);
@@ -508,6 +495,22 @@ export function SettingsDrawer({
                       </option>
                     ))}
                   </select>
+                  <button
+                    type="button"
+                    className="btn"
+                    disabled={ttsLoading}
+                    onClick={() => {
+                      if (!isTauri()) return;
+                      setTtsLoading(true);
+                      void api
+                        .ttsVoices()
+                        .then(setTtsVoices)
+                        .catch(() => undefined)
+                        .finally(() => setTtsLoading(false));
+                    }}
+                  >
+                    {ttsLoading ? "读取中…" : "读取系统音色"}
+                  </button>
                 </label>
               ) : (
                 <>
