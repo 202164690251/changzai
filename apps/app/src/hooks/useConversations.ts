@@ -1,5 +1,5 @@
 // 多会话：每个聊天有独立人格/关系/标题；消息按 payload.convId 归档
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { EmotionState, MoodOverride, PersonaProfile, ProactiveState, RelationshipProfile, StyleFeedback } from "@changzai/core";
 import type { LlmConfig } from "../lib/tauri.ts";
 import { api, isTauri } from "../lib/tauri.ts";
@@ -100,6 +100,7 @@ export function useConversations(dbReady: boolean): ConversationsApi {
   const [items, setItems] = useState<ConversationRecord[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [ready, setReady] = useState(!isTauri());
+  const writeTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!isTauri() || !dbReady) return;
@@ -133,15 +134,24 @@ export function useConversations(dbReady: boolean): ConversationsApi {
     });
   }, []);
 
+  const schedulePersist = useCallback((next: ConversationRecord[]) => {
+    if (!isTauri()) return;
+    if (writeTimerRef.current !== null) window.clearTimeout(writeTimerRef.current);
+    writeTimerRef.current = window.setTimeout(() => {
+      writeTimerRef.current = null;
+      persist(next);
+    }, 300);
+  }, []);
+
   const update = useCallback((id: string, patch: Partial<ConversationRecord>) => {
     setItems((previous) => {
       const next = previous.map((item) =>
         item.id === id ? { ...item, ...patch, updatedAt: Date.now() } : item,
       );
-      persist(next);
+      schedulePersist(next);
       return next;
     });
-  }, []);
+  }, [schedulePersist]);
 
   const remove = useCallback((id: string) => {
     setItems((previous) => {
@@ -163,5 +173,9 @@ export function useConversations(dbReady: boolean): ConversationsApi {
   }, [activeId, ready]);
 
   const active = items.find((item) => item.id === activeId) ?? null;
+  useEffect(() => () => {
+    if (writeTimerRef.current !== null) window.clearTimeout(writeTimerRef.current);
+  }, []);
+
   return { items, activeId, active, ready, upsert, update, remove, setActive: select };
 }

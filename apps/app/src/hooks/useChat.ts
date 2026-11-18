@@ -232,6 +232,8 @@ export function useChat(options: ChatOptions): ChatApi {
             /* 跳过损坏的一行 */
           }
         }
+        // chat_load 按 ts DESC 返回；消息列表需要时间正序
+        loaded.reverse();
         setMessages(loaded);
         setUnread(0);
         counter.current = loaded.length;

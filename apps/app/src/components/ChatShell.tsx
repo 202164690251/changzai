@@ -97,6 +97,8 @@ export function ChatShell(): ReactElement {
   const tts = useTts(voiceSettings, show);
   const autoSpokenRef = useRef<Set<string>>(new Set());
   const autoStartRef = useRef(Date.now());
+  const voiceBubbleSinceRef = useRef(Date.now());
+  const lastVoicedTsRef = useRef(0);
 
   const [railTab, setRailTab] = useState<RailTab>("chat");
   const [search, setSearch] = useState("");
@@ -402,14 +404,6 @@ export function ChatShell(): ReactElement {
     })();
   }, [db.ready, db.stats?.messageCount]);
 
-  const clearedDemo = useRef(false);
-  useEffect(() => {
-    if (!clearedDemo.current && persona.profile !== null && persona.profile.source.her_messages > 0) {
-      clearedDemo.current = true;
-      clear();
-    }
-  }, [clear, persona.profile]);
-
   const openImport = useCallback(() => {
     importer.reset();
     setImportOpen(true);
@@ -707,21 +701,55 @@ export function ChatShell(): ReactElement {
 
   // ta 按概率用语音气泡回复；与自动朗读独立
   useEffect(() => {
+    voiceBubbleSinceRef.current = Date.now();
+    lastVoicedTsRef.current = 0;
+  }, [activeConversation?.id]);
+
+  useEffect(() => {
+    if (voiceSettings.enabled) voiceBubbleSinceRef.current = Date.now();
+  }, [voiceSettings.enabled]);
+
+  // 保存左侧列表的最后一条预览
+  useEffect(() => {
+    if (!activeConversation || messages.length === 0) return;
+    const last = lastMessageOf(messages);
+    if (!last) return;
+    const preview = messagePreview(last);
+    if (activeConversation.lastPreview === preview && activeConversation.lastMessageAt === last.ts) return;
+    conversations.update(activeConversation.id, { lastPreview: preview, lastMessageAt: last.ts });
+  }, [activeConversation, conversations, messages]);
+
+  useEffect(() => {
     const chance = voiceSettings.voiceReplyChance ?? 30;
     if (!voiceSettings.enabled || chance <= 0) return;
     const timer = window.setTimeout(() => {
+      const since = Math.max(autoStartRef.current, voiceBubbleSinceRef.current);
       const candidate = [...messages]
         .reverse()
-        .find((message) => message.from === "her" && message.kind === "text" && message.ts >= autoStartRef.current);
-      if (!candidate || candidate.kind !== "text" || voicedReplyRef.current.has(candidate.id)) return;
+        .find((message) => message.from === "her" && message.kind === "text" && message.ts >= since);
+      if (
+        !candidate ||
+        candidate.kind !== "text" ||
+        candidate.ts <= lastVoicedTsRef.current ||
+        voicedReplyRef.current.has(candidate.id)
+      ) {
+        return;
+      }
       voicedReplyRef.current.add(candidate.id);
+      lastVoicedTsRef.current = candidate.ts;
       if (Math.random() * 100 >= chance) return;
       void tts.synthesize(candidate.text).then((voice) => {
         if (voice) replaceHerVoice(candidate.id, voice.dataUrl, voice.durationSec, candidate.text);
       });
     }, 900);
     return () => window.clearTimeout(timer);
-  }, [messages, replaceHerVoice, tts, voiceSettings.enabled, voiceSettings.voiceReplyChance]);
+  }, [
+    messages,
+    replaceHerVoice,
+    tts,
+    voiceSettings.enabled,
+    voiceSettings.voiceReplyChance,
+  ]);
 
   const handlePickImage = useCallback(
     (file: File) => {
