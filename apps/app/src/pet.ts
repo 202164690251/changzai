@@ -37,7 +37,7 @@ let bubbleTimer: number | null = null;
 let menuOpen = false;
 let mini = false;
 let chatOpen = false;
-let live2dHandle: { destroy: () => void; resize: () => void } | null = null;
+let live2dHandle: { destroy: () => void; resize: () => void; tap: () => void } | null = null;
 let live2dId: string | null = null;
 let live2dChecked: string | null = null;
 let live2dLoading = false;
@@ -268,6 +268,7 @@ window.addEventListener("mouseup", () => {
 
 stage.addEventListener("click", () => {
   if (menuOpen) return;
+  live2dHandle?.tap();
   if (suppressClick) {
     suppressClick = false;
     return;

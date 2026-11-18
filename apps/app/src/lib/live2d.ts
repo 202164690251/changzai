@@ -6,6 +6,7 @@ import { loadLive2D } from "./live2dStore.ts";
 export interface Live2DHandle {
   destroy: () => void;
   resize: () => void;
+  tap: () => void;
 }
 
 const CANVAS_SIZE = 200;
@@ -123,8 +124,24 @@ export async function mountLive2D(host: HTMLElement, conversationId: string): Pr
     throw error;
   }
 
+  const play = (group: string): void => {
+    if (!model) return;
+    try {
+      const result = model.motion(group);
+      if (result && typeof result.catch === "function") result.catch(() => undefined);
+    } catch {
+      /* 模型没有这个动作组时保持静止 */
+    }
+  };
+
+  // 有 Idle 组的模型自动进入待机；没有就保持第一帧
+  play("Idle");
+
   return {
     resize: fit,
+    tap: () => {
+      play("Tap");
+    },
     destroy: () => {
       model?.destroy();
       app.destroy(true);
