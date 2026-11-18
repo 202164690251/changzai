@@ -9,6 +9,7 @@ import { api, isTauri, type DbStats, type LlmConfig, type MediaKind, type TtsVoi
 import type { ConversationImportStats } from "../hooks/useConversations.ts";
 import { Avatar } from "./Avatar.tsx";
 import { PetImageCrop } from "./PetImageCrop.tsx";
+import { Live2DImport } from "./Live2DImport.tsx";
 import { Icon } from "./Icons.tsx";
 
 export interface SettingsDrawerProps {
@@ -82,6 +83,7 @@ export interface SettingsDrawerProps {
   onPetImageChange: (dataUrl: string | null) => void;
   conversationStats: ConversationImportStats | null;
   legacyUnscoped: boolean;
+  conversationId: string | null;
 }
 
 /** 设置抽屉：双方昵称/头像、回忆素材导入、使用说明。 */
@@ -155,6 +157,7 @@ export function SettingsDrawer({
   onPetImageChange,
   conversationStats,
   legacyUnscoped,
+  conversationId,
 }: SettingsDrawerProps): ReactElement {
   const herInputRef = useRef<HTMLInputElement | null>(null);
   const meInputRef = useRef<HTMLInputElement | null>(null);
@@ -397,8 +400,9 @@ export function SettingsDrawer({
                   );
               }}
             />
+            <Live2DImport conversationId={conversationId} />
             <p className="settings-hint">
-              Live2D 需要单独导入模型文件；这一版先用一张图跑通桌宠，下一阶段再接自动抠图和 Live2D。
+              没有 Live2D 模型时使用上面的正方形图片；导入模型后桌宠会自动切换为 Live2D。
             </p>
           </section>
 

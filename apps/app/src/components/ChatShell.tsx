@@ -168,7 +168,7 @@ export function ChatShell(): ReactElement {
     } catch {
       /* 头像过大或存储不可用时跳过 */
     }
-  }, [activeConversation?.petImage, her.avatar, her.name, messages, typing]);
+  }, [activeConversation?.id, activeConversation?.petImage, her.avatar, her.name, messages, typing]);
 
   const handleTogglePet = useCallback(async (): Promise<void> => {
     if (!isTauri()) {
@@ -1084,6 +1084,7 @@ export function ChatShell(): ReactElement {
           onPetImageChange={handlePetImageChange}
           conversationStats={conversationImportStats}
           legacyUnscoped={legacyUnscoped}
+          conversationId={activeConversation?.id ?? null}
           analyticsCounts={analytics.counts}
           analyticsTotal={analytics.total}
           onClearAnalytics={analytics.clear}

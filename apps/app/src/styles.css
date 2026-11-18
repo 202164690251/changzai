@@ -2292,3 +2292,21 @@ textarea:focus-visible {
   gap: 8px;
   margin-top: 16px;
 }
+/* Live2D 模型导入 */
+.live2d-import {
+  margin: 10px 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel-bg);
+}
+.live2d-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.live2d-status .settings-note {
+  margin: 0;
+}
