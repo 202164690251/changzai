@@ -3,6 +3,7 @@ import { buildRecordedVoice } from "./lib/voiceRecorder.ts";
 import "./pet.css";
 
 interface PetState {
+  id?: string;
   name?: string;
   avatar?: string | null;
   text?: string;
@@ -24,8 +25,9 @@ const input = document.getElementById("pet-input") as HTMLInputElement;
 const mic = document.getElementById("pet-mic") as HTMLButtonElement;
 const quick = document.getElementById("pet-quick") as HTMLElement;
 const panel = document.getElementById("pet-chat-panel") as HTMLElement;
+const live2dHost = document.getElementById("pet-live2d") as HTMLElement;
 
-if (!root || !stage || !image || !fallback || !nameEl || !statusEl || !bubble || !menu || !form || !input || !mic || !quick || !panel) {
+if (!root || !stage || !image || !fallback || !nameEl || !statusEl || !bubble || !menu || !form || !input || !mic || !quick || !panel || !live2dHost) {
   throw new Error("PET_DOM_MISSING");
 }
 
@@ -35,6 +37,42 @@ let bubbleTimer: number | null = null;
 let menuOpen = false;
 let mini = false;
 let chatOpen = false;
+let live2dHandle: { destroy: () => void; resize: () => void } | null = null;
+let live2dId: string | null = null;
+let live2dChecked: string | null = null;
+let live2dLoading = false;
+
+async function syncLive2D(state: PetState): Promise<void> {
+  const id = state.id;
+  if (!id || id === live2dChecked || live2dLoading) return;
+  live2dLoading = true;
+  live2dHandle?.destroy();
+  live2dHandle = null;
+  live2dHost.hidden = true;
+  try {
+    const module = await import("./lib/live2d.ts");
+    const handle = await module.mountLive2D(live2dHost, id);
+    live2dChecked = id;
+    live2dId = handle ? id : null;
+    if (handle) {
+      live2dHandle = handle;
+      live2dHost.hidden = false;
+      image.hidden = true;
+      fallback.hidden = true;
+      stage.classList.add("has-live2d");
+    } else {
+      stage.classList.remove("has-live2d");
+      live2dHost.hidden = true;
+    }
+  } catch {
+    live2dChecked = id;
+    live2dId = null;
+    live2dHost.hidden = true;
+    stage.classList.remove("has-live2d");
+  } finally {
+    live2dLoading = false;
+  }
+}
 let pointerDown = false;
 let dragStarted = false;
 let suppressClick = false;
@@ -94,12 +132,13 @@ function applyState(): void {
   updateStatus(state);
   if (state.avatar) {
     image.src = state.avatar;
-    image.hidden = false;
+    image.hidden = live2dId !== null;
     fallback.hidden = true;
   } else {
     image.hidden = true;
-    fallback.hidden = false;
+    fallback.hidden = live2dId !== null;
   }
+  void syncLive2D(state);
   if (state.text && (state.ts ?? 0) > lastTs) {
     lastTs = state.ts ?? Date.now();
     showBubble(state.text);
@@ -111,6 +150,7 @@ function applyMiniClass(): void {
   const button = menu.querySelector<HTMLButtonElement>('[data-action="mini"]');
   if (button) button.textContent = mini ? "完整模式" : "Mini 模式";
   panel.hidden = mini || !chatOpen;
+  live2dHandle?.resize();
 }
 
 async function toggleMini(): Promise<void> {
@@ -281,6 +321,15 @@ menu.addEventListener("click", (event) => {
 
 window.addEventListener("storage", (event) => {
   if (event.key === "pet.state") applyState();
+  if (event.key === "pet.live2d.rev") {
+    live2dHandle?.destroy();
+    live2dHandle = null;
+    live2dId = null;
+    live2dChecked = null;
+    live2dHost.hidden = true;
+    stage.classList.remove("has-live2d");
+    applyState();
+  }
 });
 window.setInterval(applyState, 1200);
 window.addEventListener("blur", hideMenu);
