@@ -12,6 +12,7 @@ export interface Live2DHandle {
   playMotion: (group: string) => void;
   playExpression: (index: number) => void;
   setTalking: (talking: boolean) => void;
+  focus: (x: number, y: number) => void;
 }
 
 const CANVAS_SIZE = 200;
@@ -200,6 +201,13 @@ export async function mountLive2D(host: HTMLElement, conversationId: string): Pr
     playMotion: play,
     playExpression,
     setTalking,
+    focus: (x: number, y: number) => {
+      try {
+        model?.focus(x, y);
+      } catch {
+        /* 忽略 */
+      }
+    },
     destroy: () => {
       if (mouthTimer !== null) window.clearInterval(mouthTimer);
       model?.destroy();
