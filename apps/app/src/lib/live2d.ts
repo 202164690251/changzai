@@ -12,6 +12,8 @@ export interface Live2DHandle {
   playMotion: (group: string) => void;
   playExpression: (index: number) => void;
   setTalking: (talking: boolean) => void;
+  setMouthLevel: (level: number) => void;
+  hitTest: (x: number, y: number) => string[];
   focus: (x: number, y: number) => void;
 }
 
@@ -148,6 +150,7 @@ export async function mountLive2D(host: HTMLElement, conversationId: string): Pr
   const motions = Object.keys(settings?.motions ?? {});
   const expressions = settings?.expressions?.length ?? 0;
   let talking = false;
+  let mouthLevel = 0;
   let mouthTimer: number | null = null;
 
   const setTalking = (next: boolean): void => {
@@ -156,7 +159,11 @@ export async function mountLive2D(host: HTMLElement, conversationId: string): Pr
       mouthTimer = window.setInterval(() => {
         if (!model) return;
         try {
-          const value = talking ? 0.05 + Math.abs(Math.sin(Date.now() / 95)) * 0.55 : 0;
+          const value = talking
+            ? mouthLevel > 0.02
+              ? Math.min(0.75, mouthLevel)
+              : 0.05 + Math.abs(Math.sin(Date.now() / 95)) * 0.55
+            : 0;
           const core = model.internalModel.coreModel as unknown as {
             setParameterValueById: (id: string, value: number) => void;
           };
@@ -201,6 +208,16 @@ export async function mountLive2D(host: HTMLElement, conversationId: string): Pr
     playMotion: play,
     playExpression,
     setTalking,
+    setMouthLevel: (level: number) => {
+      mouthLevel = Math.max(0, Math.min(1, level));
+    },
+    hitTest: (x: number, y: number) => {
+      try {
+        return model?.hitTest(x, y) ?? [];
+      } catch {
+        return [];
+      }
+    },
     focus: (x: number, y: number) => {
       try {
         model?.focus(x, y);

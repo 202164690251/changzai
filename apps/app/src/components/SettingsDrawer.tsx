@@ -164,6 +164,12 @@ export function SettingsDrawer({
   const petImageInputRef = useRef<HTMLInputElement | null>(null);
   const [petImageError, setPetImageError] = useState<string | null>(null);
   const [petCropSource, setPetCropSource] = useState<string | null>(null);
+  const [petAuto, setPetAuto] = useState(() => localStorage.getItem("pet.live2d.auto") !== "0");
+  const [petActivity, setPetActivity] = useState<"quiet" | "normal" | "lively">(() => {
+    const saved = localStorage.getItem("pet.activity");
+    return saved === "quiet" || saved === "lively" ? saved : "normal";
+  });
+  const [petSleep, setPetSleep] = useState(() => localStorage.getItem("pet.sleep") !== "0");
   const [avatarCrop, setAvatarCrop] = useState<{ who: PersonKey; source: string } | null>(null);
   const [avatarError, setAvatarError] = useState<string | null>(null);
   const [ttsVoices, setTtsVoices] = useState<TtsVoice[]>([]);
@@ -354,10 +360,10 @@ export function SettingsDrawer({
 
           <section className="settings-section" aria-labelledby="settings-pet">
             <header className="settings-section-head">
-              <h3 id="settings-pet">桌宠（V2.3 MVP）</h3>
+              <h3 id="settings-pet">桌宠（V2.4）</h3>
             </header>
             <p className="settings-hint">
-              透明小窗，使用当前聊天头像。单击说话、双击打开聊天、右键菜单、可拖动并记住位置。默认关闭。
+              透明小窗，点头部可互动，点身体打开快捷聊天，双击打开主界面；右键动作/表情/互动。默认关闭。
             </p>
             <div className="media-actions">
               <button type="button" className="btn primary" onClick={onTogglePet}>
@@ -404,6 +410,47 @@ export function SettingsDrawer({
             <p className="settings-hint">
               没有 Live2D 模型时使用上面的正方形图片；导入模型后桌宠会自动切换为 Live2D。
             </p>
+            <div className="pet-behavior-settings">
+              <span className="field-label">桌宠行为</span>
+              <label className="settings-check">
+                <input
+                  type="checkbox"
+                  checked={petAuto}
+                  onChange={(event) => {
+                    setPetAuto(event.target.checked);
+                    localStorage.setItem("pet.live2d.auto", event.target.checked ? "1" : "0");
+                  }}
+                />
+                <span>自动待机/动作/表情</span>
+              </label>
+              <label className="settings-field">
+                <span className="field-label">活跃度</span>
+                <select
+                  className="text-input"
+                  value={petActivity}
+                  onChange={(event) => {
+                    const next = event.target.value as "quiet" | "normal" | "lively";
+                    setPetActivity(next);
+                    localStorage.setItem("pet.activity", next);
+                  }}
+                >
+                  <option value="quiet">安静 · 约 22 秒一次</option>
+                  <option value="normal">日常 · 约 12 秒一次</option>
+                  <option value="lively">活泼 · 约 7 秒一次</option>
+                </select>
+              </label>
+              <label className="settings-check">
+                <input
+                  type="checkbox"
+                  checked={petSleep}
+                  onChange={(event) => {
+                    setPetSleep(event.target.checked);
+                    localStorage.setItem("pet.sleep", event.target.checked ? "1" : "0");
+                  }}
+                />
+                <span>23:00–07:00 自动睡觉（点击叫醒）</span>
+              </label>
+            </div>
           </section>
 
           <section className="settings-section" aria-labelledby="settings-llm">

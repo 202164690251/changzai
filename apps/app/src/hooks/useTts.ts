@@ -15,14 +15,26 @@ export interface TtsApi {
   synthesize: (text: string) => Promise<SynthesizedVoice | null>;
   speak: (text: string) => Promise<boolean>;
   stop: () => void;
+  /** 当前播放音量包络 0–1，用于 Live2D 口型 */
+  getLevel: () => number;
   test: () => Promise<boolean>;
 }
 
 export function useTts(settings: VoiceSettings, onError?: (message: string) => void): TtsApi {
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
   const [speaking, setSpeaking] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const closeAudio = useCallback(() => {
+    analyserRef.current = null;
+    if (audioContextRef.current) {
+      void audioContextRef.current.close().catch(() => undefined);
+      audioContextRef.current = null;
+    }
+  }, []);
 
   const stop = useCallback(() => {
     const audio = audioRef.current;
@@ -31,8 +43,9 @@ export function useTts(settings: VoiceSettings, onError?: (message: string) => v
       audio.src = "";
     }
     audioRef.current = null;
+    closeAudio();
     setSpeaking(false);
-  }, []);
+  }, [closeAudio]);
 
   const synthesize = useCallback(
     async (text: string): Promise<SynthesizedVoice | null> => {
@@ -81,6 +94,18 @@ export function useTts(settings: VoiceSettings, onError?: (message: string) => v
       try {
         const audio = new Audio(voice.dataUrl);
         audioRef.current = audio;
+        try {
+          const context = new AudioContext();
+          const analyser = context.createAnalyser();
+          analyser.fftSize = 256;
+          const source = context.createMediaElementSource(audio);
+          source.connect(analyser);
+          analyser.connect(context.destination);
+          audioContextRef.current = context;
+          analyserRef.current = analyser;
+        } catch {
+          // WebAudio 不可用时仍用普通 Audio 播放，口型回退正弦
+        }
         audio.addEventListener("ended", () => setSpeaking(false));
         audio.addEventListener("pause", () => setSpeaking(false));
         audio.addEventListener("error", () => setSpeaking(false));
@@ -98,9 +123,23 @@ export function useTts(settings: VoiceSettings, onError?: (message: string) => v
     [onError, stop, synthesize],
   );
 
+  const getLevel = useCallback((): number => {
+    const analyser = analyserRef.current;
+    if (!analyser) return 0;
+    const data = new Uint8Array(analyser.fftSize);
+    analyser.getByteTimeDomainData(data);
+    let sum = 0;
+    for (const value of data) {
+      const centered = (value - 128) / 128;
+      sum += centered * centered;
+    }
+    const rms = Math.sqrt(sum / data.length);
+    return Math.min(1, rms * 3.2);
+  }, []);
+
   const test = useCallback(() => speak("你来啦，我刚还在想你。"), [speak]);
 
   useEffect(() => () => stop(), [stop]);
 
-  return { speaking, generating, error, synthesize, speak, stop, test };
+  return { speaking, generating, error, synthesize, speak, stop, getLevel, test };
 }

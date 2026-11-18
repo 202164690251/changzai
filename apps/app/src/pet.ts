@@ -10,6 +10,8 @@ interface PetState {
   ts?: number;
   typing?: boolean;
   talking?: boolean;
+  mood?: string;
+  reminder?: boolean;
   lastFrom?: string;
 }
 
@@ -28,8 +30,11 @@ const mic = document.getElementById("pet-mic") as HTMLButtonElement;
 const quick = document.getElementById("pet-quick") as HTMLElement;
 const panel = document.getElementById("pet-chat-panel") as HTMLElement;
 const live2dHost = document.getElementById("pet-live2d") as HTMLElement;
+const actionsPanel = document.getElementById("pet-actions") as HTMLElement;
+const actionList = document.getElementById("pet-action-list") as HTMLElement;
+const actionsClose = document.getElementById("pet-actions-close") as HTMLButtonElement;
 
-if (!root || !stage || !image || !head || !fallback || !nameEl || !statusEl || !bubble || !menu || !form || !input || !mic || !quick || !panel || !live2dHost) {
+if (!root || !stage || !image || !head || !fallback || !nameEl || !statusEl || !bubble || !menu || !actionsPanel || !actionList || !actionsClose || !form || !input || !mic || !quick || !panel || !live2dHost) {
   throw new Error("PET_DOM_MISSING");
 }
 
@@ -48,6 +53,8 @@ let live2dHandle: {
   playMotion: (group: string) => void;
   playExpression: (index: number) => void;
   setTalking: (talking: boolean) => void;
+  setMouthLevel: (level: number) => void;
+  hitTest: (x: number, y: number) => string[];
   focus: (x: number, y: number) => void;
 } | null = null;
 let live2dId: string | null = null;
@@ -55,6 +62,18 @@ let live2dChecked: string | null = null;
 let live2dLoading = false;
 let autoLive2D = true;
 let lastLive2DState: PetState = {};
+
+type BehaviorState = "idle" | "talking" | "thinking" | "dragging" | "sleeping" | "happy" | "annoyed";
+let behaviorState: BehaviorState = "idle";
+let behaviorUntil = 0;
+let lastMood = "";
+let lastReminder = false;
+let sleepOverrideUntil = 0;
+let sleepEnabled = true;
+let activityLevel: "quiet" | "normal" | "lively" = "normal";
+let lastAutoAt = 0;
+let lastPokeAt = 0;
+let pokeCount = 0;
 
 async function syncLive2D(state: PetState): Promise<void> {
   const id = state.id;
@@ -130,10 +149,97 @@ function hideMenu(): void {
 }
 
 function updateStatus(state: PetState): void {
-  const text = state.typing ? "在想…" : state.lastFrom === "her" ? "刚回完" : "在线";
+  let text = state.typing ? "在想…" : state.lastFrom === "her" ? "刚回完" : "在线";
+  if (behaviorState === "talking") text = "在说话";
+  else if (behaviorState === "dragging") text = "被拎起来了";
+  else if (behaviorState === "sleeping") text = "睡着了";
+  else if (behaviorState === "happy") text = "开心";
+  else if (behaviorState === "annoyed") text = "别戳啦";
   const span = statusEl.querySelector("span");
   if (span) span.textContent = text;
-  statusEl.classList.toggle("is-thinking", Boolean(state.typing));
+  statusEl.classList.toggle("is-thinking", Boolean(state.typing) || behaviorState === "thinking");
+  document.body.dataset.petState = behaviorState;
+}
+
+function setBehavior(next: BehaviorState, durationMs = 0, bubbleText = ""): void {
+  if (behaviorState === "dragging" && next !== "dragging") return;
+  if (behaviorState === "talking" && next === "happy") return;
+  behaviorState = next;
+  behaviorUntil = durationMs > 0 ? Date.now() + durationMs : 0;
+  if (next === "talking") live2dHandle?.setTalking(true);
+  else live2dHandle?.setTalking(false);
+  updateStatus(readState());
+  if (bubbleText) showBubble(bubbleText);
+}
+
+function isNight(): boolean {
+  const hour = new Date().getHours();
+  return hour >= 23 || hour < 7;
+}
+
+function canSleep(): boolean {
+  return sleepEnabled && isNight() && Date.now() > sleepOverrideUntil;
+}
+
+function onHeadPat(): void {
+  if (behaviorState === "sleeping") {
+    sleepOverrideUntil = Date.now() + 2 * 60 * 60 * 1000;
+    setBehavior("happy", 4500);
+    showBubble("唔…醒啦");
+    live2dHandle?.tap();
+    return;
+  }
+  setBehavior("happy", 4500);
+  stage.classList.remove("is-patting");
+  void stage.offsetWidth;
+  stage.classList.add("is-patting");
+  live2dHandle?.tap();
+  showBubble(LINES[Math.floor(Math.random() * LINES.length)] ?? "在呢");
+}
+
+function onPoke(): void {
+  const now = Date.now();
+  pokeCount = now - lastPokeAt < 3500 ? pokeCount + 1 : 1;
+  lastPokeAt = now;
+  if (pokeCount >= 3) {
+    pokeCount = 0;
+    setBehavior("annoyed", 4000);
+    showBubble("别戳啦，再戳要生气了");
+  } else {
+    showBubble("嗯？");
+  }
+}
+
+function onFeed(): void {
+  setBehavior("happy", 6000);
+  live2dHandle?.tap();
+  showBubble("好吃！再来一口");
+}
+
+function wakeUp(): void {
+  sleepOverrideUntil = Date.now() + 2 * 60 * 60 * 1000;
+  setBehavior("happy", 4500);
+  showBubble("唔…醒啦");
+}
+
+function applyMood(mood: string | undefined): void {
+  if (!mood || mood === lastMood) return;
+  lastMood = mood;
+  if (behaviorState !== "idle" && behaviorState !== "thinking") return;
+  if (mood === "sunny") setBehavior("happy", 4500);
+  else if (mood === "stormy") setBehavior("annoyed", 4000);
+  if (live2dHandle && live2dHandle.expressions > 0) {
+    live2dHandle.playExpression(mood === "stormy" ? 1 : 0);
+  }
+}
+
+function applyReminder(reminder: boolean | undefined): void {
+  const next = Boolean(reminder);
+  if (next && !lastReminder) {
+    showBubble("该起来喝口水啦，别一直坐着");
+    live2dHandle?.tap();
+  }
+  lastReminder = next;
 }
 
 function setChatOpen(next: boolean): void {
@@ -168,7 +274,26 @@ function applyState(): void {
   const name = state.name?.trim() || "ta";
   nameEl.textContent = name;
   fallback.textContent = name.slice(0, 1);
+  applyMood(state.mood);
+  applyReminder(state.reminder);
+  if (state.talking) {
+    if (behaviorState !== "talking") setBehavior("talking");
+  } else if (behaviorState === "talking") {
+    setBehavior(canSleep() ? "sleeping" : "idle");
+  } else if (behaviorState === "idle" && state.typing) {
+    setBehavior("thinking");
+  } else if (behaviorState === "thinking" && !state.typing) {
+    setBehavior("idle");
+  }
+  if (canSleep() && behaviorState === "idle" && !state.talking) {
+    setBehavior("sleeping");
+  }
+  if (!canSleep() && behaviorState === "sleeping") setBehavior("idle");
+  if (behaviorUntil > 0 && Date.now() > behaviorUntil) {
+    setBehavior(canSleep() ? "sleeping" : "idle");
+  }
   updateStatus(state);
+  live2dHandle?.setTalking(Boolean(state.talking));
   if (state.avatar) {
     image.src = state.avatar;
     head.src = state.avatar;
@@ -305,36 +430,53 @@ window.addEventListener("mousemove", (event) => {
   if (Math.hypot(event.screenX - downX, event.screenY - downY) < 5) return;
   dragStarted = true;
   suppressClick = true;
+  setBehavior("dragging");
   void invoke("pet_start_drag").catch(() => undefined);
 });
 
 window.addEventListener("mouseup", () => {
   if (menuOpen) return;
   pointerDown = false;
+  if (behaviorState === "dragging") {
+    setBehavior(canSleep() ? "sleeping" : "idle");
+  }
   void invoke("pet_save_position").catch(() => undefined);
 });
 
-stage.addEventListener("click", () => {
+function clickZone(event: MouseEvent): "head" | "body" {
+  const rect = stage.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) return "body";
+  const x = ((event.clientX - rect.left) / rect.width) * 200;
+  const y = ((event.clientY - rect.top) / rect.height) * 200;
+  if (live2dHandle) {
+    const hits = live2dHandle.hitTest(x, y);
+    if (hits.some((hit: string) => /head|face/i.test(hit))) return "head";
+    if (hits.length > 0) return "body";
+  }
+  return y < 200 * 0.35 ? "head" : "body";
+}
+
+stage.addEventListener("click", (event) => {
   if (menuOpen) return;
-  live2dHandle?.tap();
   if (suppressClick) {
     suppressClick = false;
     return;
   }
+  if (behaviorState === "sleeping") {
+    wakeUp();
+    return;
+  }
+  const zone = clickZone(event);
+  if (zone === "head") {
+    onHeadPat();
+    return;
+  }
+  onPoke();
   if (mini) {
-    stage.classList.remove("is-patting");
-    void stage.offsetWidth;
-    stage.classList.add("is-patting");
-    showBubble(LINES[Math.floor(Math.random() * LINES.length)] ?? "在呢");
+    live2dHandle?.tap();
     return;
   }
   setChatOpen(!chatOpen);
-  if (!chatOpen) {
-    stage.classList.remove("is-patting");
-    void stage.offsetWidth;
-    stage.classList.add("is-patting");
-    showBubble(LINES[Math.floor(Math.random() * LINES.length)] ?? "在呢");
-  }
 });
 
 stage.addEventListener("dblclick", () => {
@@ -352,6 +494,51 @@ window.addEventListener("contextmenu", (event) => {
   const y = Math.min(event.clientY, window.innerHeight - height - 6);
   menu.style.left = `${Math.max(4, x)}px`;
   menu.style.top = `${Math.max(4, y)}px`;
+});
+
+function openActionPanel(): void {
+  hideMenu();
+  if (!live2dHandle) {
+    showBubble("当前没有 Live2D 模型");
+    return;
+  }
+  actionList.replaceChildren();
+  const addButton = (label: string, onClick: () => void): void => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = label;
+    button.addEventListener("click", () => {
+      onClick();
+      actionsPanel.hidden = true;
+    });
+    actionList.appendChild(button);
+  };
+  if (live2dHandle.motions.length > 0) {
+    const title = document.createElement("p");
+    title.className = "pet-action-title";
+    title.textContent = "动作";
+    actionList.appendChild(title);
+    for (const group of live2dHandle.motions) {
+      addButton(group, () => live2dHandle?.playMotion(group));
+    }
+  }
+  if (live2dHandle.expressions > 0) {
+    const title = document.createElement("p");
+    title.className = "pet-action-title";
+    title.textContent = "表情";
+    actionList.appendChild(title);
+    for (let index = 0; index < live2dHandle.expressions; index += 1) {
+      addButton(`表情 ${index + 1}`, () => live2dHandle?.playExpression(index));
+    }
+  }
+  if (actionList.childElementCount === 0) {
+    actionList.textContent = "这个模型没有可选动作或表情";
+  }
+  actionsPanel.hidden = false;
+}
+
+actionsClose.addEventListener("click", () => {
+  actionsPanel.hidden = true;
 });
 
 function randomMotion(): void {
@@ -390,6 +577,7 @@ menu.addEventListener("click", (event) => {
   hideMenu();
   if (action === "chat") void invoke("pet_open_main");
   else if (action === "auto") toggleAuto();
+  else if (action === "actions") openActionPanel();
   else if (action === "motion") randomMotion();
   else if (action === "expression") randomExpression();
   else if (action === "pat") {
@@ -402,25 +590,19 @@ menu.addEventListener("click", (event) => {
 });
 
 window.addEventListener("storage", (event) => {
-  if (event.key === "pet.state") try {
-  const savedAuto = localStorage.getItem("pet.live2d.auto");
-  if (savedAuto !== null) autoLive2D = savedAuto === "1";
-} catch {
-  /* 忽略 */
-}
-
-window.setInterval(() => {
-  if (!live2dHandle || !autoLive2D || lastLive2DState.talking) return;
-  const groups = live2dHandle.motions;
-  if (groups.length === 0) return;
-  const idle = groups.find((group) => /idle/i.test(group)) ?? groups[0];
-  if (idle) live2dHandle.playMotion(idle);
-  if (live2dHandle.expressions > 0 && Math.random() < 0.3) {
-    live2dHandle.playExpression(Math.floor(Math.random() * live2dHandle.expressions));
+  if (event.key === "pet.live2d.auto") {
+    autoLive2D = localStorage.getItem("pet.live2d.auto") !== "0";
+    applyMiniClass();
   }
-}, 12000);
-
-applyState();
+  if (event.key === "pet.activity") {
+    const saved = localStorage.getItem("pet.activity");
+    activityLevel = saved === "quiet" || saved === "lively" ? saved : "normal";
+  }
+  if (event.key === "pet.sleep") {
+    sleepEnabled = localStorage.getItem("pet.sleep") !== "0";
+    if (!sleepEnabled && behaviorState === "sleeping") setBehavior("idle");
+  }
+  if (event.key === "pet.state") applyState();
   if (event.key === "pet.live2d.rev") {
     live2dHandle?.destroy();
     live2dHandle = null;
@@ -431,7 +613,50 @@ applyState();
     applyState();
   }
 });
+
+try {
+  const savedAuto = localStorage.getItem("pet.live2d.auto");
+  if (savedAuto !== null) autoLive2D = savedAuto === "1";
+  const savedActivity = localStorage.getItem("pet.activity");
+  if (savedActivity === "quiet" || savedActivity === "normal" || savedActivity === "lively") {
+    activityLevel = savedActivity;
+  }
+  const savedSleep = localStorage.getItem("pet.sleep");
+  if (savedSleep !== null) sleepEnabled = savedSleep === "1";
+} catch {
+  /* 忽略 */
+}
+
 window.setInterval(applyState, 1200);
+
+// 音量包络 → Live2D 口型（主窗口每 80ms 写入 pet.voice.level）
+window.setInterval(() => {
+  if (!live2dHandle || !lastLive2DState.talking) return;
+  try {
+    const level = Number(localStorage.getItem("pet.voice.level") ?? "0");
+    live2dHandle.setMouthLevel(Number.isFinite(level) ? level : 0);
+  } catch {
+    /* 忽略 */
+  }
+}, 80);
+
+window.setInterval(() => {
+  if (!live2dHandle || !autoLive2D) return;
+  if (lastLive2DState.talking || behaviorState !== "idle") return;
+  const interval = activityLevel === "quiet" ? 22000 : activityLevel === "lively" ? 7000 : 12000;
+  if (Date.now() - lastAutoAt < interval) return;
+  lastAutoAt = Date.now();
+  const groups = live2dHandle.motions;
+  if (groups.length === 0) return;
+  const idle = groups.find((group) => /idle/i.test(group)) ?? groups[0];
+  const playful = groups.find((group) => /tap/i.test(group));
+  const group = playful && Math.random() < 0.22 ? playful : idle;
+  if (group) live2dHandle.playMotion(group);
+  if (live2dHandle.expressions > 0 && Math.random() < 0.3) {
+    live2dHandle.playExpression(Math.floor(Math.random() * live2dHandle.expressions));
+  }
+}, 1000);
+
 window.addEventListener("blur", hideMenu);
 
 void invoke<boolean>("pet_get_mini")
