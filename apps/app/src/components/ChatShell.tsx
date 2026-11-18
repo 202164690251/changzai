@@ -104,7 +104,8 @@ export function ChatShell(): ReactElement {
       activeConversation.persona.source.messages > 0,
   );
   const herName = activeConversation?.herName ?? displayName(profile.her, "ta");
-  const herAvatar = activeConversation?.herAvatar ?? profile.her.avatar;
+  // 有会话时尊重会话自己的头像；null 表示该聊天还没设置，不能回退成上一个聊天的头像
+  const herAvatar = activeConversation ? activeConversation.herAvatar : profile.her.avatar;
   const meName = displayName(profile.me, "我");
   const her = useMemo<PersonProfile>(() => ({ name: herName, avatar: herAvatar }), [herAvatar, herName]);
   const relationship = useRelationship(herName, meName, db.ready);
@@ -489,9 +490,9 @@ export function ChatShell(): ReactElement {
       const relation = relationship.profile ?? fallbackRelationship(meName);
       const record: ConversationRecord = {
         id: `conv-${now.toString(36)}`,
-        title: displayName(profile.her, "ta"),
-        herName: displayName(profile.her, "ta"),
-        herAvatar: profile.her.avatar,
+        title: "ta",
+        herName: "ta",
+        herAvatar: null,
         persona: importedProfile,
         relationship: relation,
         greeting: "",
