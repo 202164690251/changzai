@@ -51,7 +51,10 @@ async function syncLive2D(state: PetState): Promise<void> {
   live2dHost.hidden = true;
   try {
     const module = await import("./lib/live2d.ts");
-    const handle = await module.mountLive2D(live2dHost, id);
+    const handle = await Promise.race([
+      module.mountLive2D(live2dHost, id),
+      new Promise<null>((resolve) => window.setTimeout(() => resolve(null), 15000)),
+    ]);
     live2dChecked = id;
     live2dId = handle ? id : null;
     if (handle) {
@@ -63,12 +66,14 @@ async function syncLive2D(state: PetState): Promise<void> {
     } else {
       stage.classList.remove("has-live2d");
       live2dHost.hidden = true;
+      showStatic(readState());
     }
   } catch {
     live2dChecked = id;
     live2dId = null;
     live2dHost.hidden = true;
     stage.classList.remove("has-live2d");
+    showStatic(readState());
   } finally {
     live2dLoading = false;
   }
@@ -124,20 +129,29 @@ function setChatOpen(next: boolean): void {
   if (next) window.setTimeout(() => input.focus(), 60);
 }
 
+function showStatic(state: PetState): void {
+  if (live2dId !== null) {
+    image.hidden = true;
+    fallback.hidden = true;
+    return;
+  }
+  if (state.avatar) {
+    image.hidden = false;
+    fallback.hidden = true;
+  } else {
+    image.hidden = true;
+    fallback.hidden = false;
+  }
+}
+
 function applyState(): void {
   const state = readState();
   const name = state.name?.trim() || "ta";
   nameEl.textContent = name;
   fallback.textContent = name.slice(0, 1);
   updateStatus(state);
-  if (state.avatar) {
-    image.src = state.avatar;
-    image.hidden = live2dId !== null;
-    fallback.hidden = true;
-  } else {
-    image.hidden = true;
-    fallback.hidden = live2dId !== null;
-  }
+  if (state.avatar) image.src = state.avatar;
+  showStatic(state);
   void syncLive2D(state);
   if (state.text && (state.ts ?? 0) > lastTs) {
     lastTs = state.ts ?? Date.now();

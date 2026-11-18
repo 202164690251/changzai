@@ -12,7 +12,7 @@
   - 上传时正方形裁剪（512×512，透明 PNG 保留）；
   - 完整模式 200×200，Mini 150×150；
 - Live2D：
-  - 设置中选择 Cubism 4 模型文件夹（`.model3.json`、`.moc3`、textures、motion/physics/expression）；
+  - 设置中选择 Cubism 4 模型文件夹或 .zip；支持 zip 内多个模型时选择角色；
   - 模型文件存 IndexedDB，不上传；
   - `pixi-live2d-display` + Cubism Core 本地渲染；
   - 模型可在完整模式和 Mini 模式下缩放显示；
