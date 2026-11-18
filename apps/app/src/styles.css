@@ -2320,3 +2320,15 @@ textarea:focus-visible {
   min-width: 0;
   flex: 1;
 }
+.crop-cutout {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 10px;
+  color: var(--text-2);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.crop-cutout input {
+  margin-top: 2px;
+}

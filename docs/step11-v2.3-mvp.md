@@ -48,3 +48,19 @@
 - `apps/app/src/components/Live2DImport.tsx`
 - `apps/app/src-tauri/src/pet.rs`
 - `apps/app/src-tauri/capabilities/pet.json`
+
+## 2026-11-19 补充
+
+- Live2D：
+  - 自动 Idle；
+  - 点击 Tap；
+  - 右键随机动作/随机表情；
+  - TTS 播放时用 ParamMouthOpenY 做轻量口型。
+- 图片桌宠：
+  - 正方形裁剪时可自动去除纯色背景；
+  - 呼吸、头部微摆、点击弹跳；
+  - 头部层为近似 2.5D 分层，不是像素级语义分割。
+- 已知限制：
+  - 复杂背景无法可靠自动抠图；
+  - 头部层按固定比例裁切，不适用于所有构图；
+  - 未实现 TTS 音素级口型、眨眼和真正的人体分割。

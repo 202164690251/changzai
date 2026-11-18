@@ -9,12 +9,14 @@ interface PetState {
   text?: string;
   ts?: number;
   typing?: boolean;
+  talking?: boolean;
   lastFrom?: string;
 }
 
 const root = document.getElementById("pet-root") as HTMLElement;
 const stage = document.getElementById("pet-stage") as HTMLElement;
 const image = document.getElementById("pet-image") as HTMLImageElement;
+const head = document.getElementById("pet-head") as HTMLImageElement;
 const fallback = document.getElementById("pet-fallback") as HTMLElement;
 const nameEl = document.getElementById("pet-name") as HTMLElement;
 const statusEl = document.getElementById("pet-status") as HTMLElement;
@@ -27,7 +29,7 @@ const quick = document.getElementById("pet-quick") as HTMLElement;
 const panel = document.getElementById("pet-chat-panel") as HTMLElement;
 const live2dHost = document.getElementById("pet-live2d") as HTMLElement;
 
-if (!root || !stage || !image || !fallback || !nameEl || !statusEl || !bubble || !menu || !form || !input || !mic || !quick || !panel || !live2dHost) {
+if (!root || !stage || !image || !head || !fallback || !nameEl || !statusEl || !bubble || !menu || !form || !input || !mic || !quick || !panel || !live2dHost) {
   throw new Error("PET_DOM_MISSING");
 }
 
@@ -37,7 +39,16 @@ let bubbleTimer: number | null = null;
 let menuOpen = false;
 let mini = false;
 let chatOpen = false;
-let live2dHandle: { destroy: () => void; resize: () => void; tap: () => void } | null = null;
+let live2dHandle: {
+  destroy: () => void;
+  resize: () => void;
+  tap: () => void;
+  motions: string[];
+  expressions: number;
+  playMotion: (group: string) => void;
+  playExpression: (index: number) => void;
+  setTalking: (talking: boolean) => void;
+} | null = null;
 let live2dId: string | null = null;
 let live2dChecked: string | null = null;
 let live2dLoading = false;
@@ -61,6 +72,7 @@ async function syncLive2D(state: PetState): Promise<void> {
       live2dHandle = handle;
       live2dHost.hidden = false;
       image.hidden = true;
+      head.hidden = true;
       fallback.hidden = true;
       stage.classList.add("has-live2d");
     } else {
@@ -132,14 +144,17 @@ function setChatOpen(next: boolean): void {
 function showStatic(state: PetState): void {
   if (live2dId !== null) {
     image.hidden = true;
+    head.hidden = true;
     fallback.hidden = true;
     return;
   }
   if (state.avatar) {
     image.hidden = false;
+    head.hidden = false;
     fallback.hidden = true;
   } else {
     image.hidden = true;
+    head.hidden = true;
     fallback.hidden = false;
   }
 }
@@ -150,7 +165,10 @@ function applyState(): void {
   nameEl.textContent = name;
   fallback.textContent = name.slice(0, 1);
   updateStatus(state);
-  if (state.avatar) image.src = state.avatar;
+  if (state.avatar) {
+    image.src = state.avatar;
+    head.src = state.avatar;
+  }
   showStatic(state);
   void syncLive2D(state);
   if (state.text && (state.ts ?? 0) > lastTs) {
@@ -320,11 +338,33 @@ window.addEventListener("contextmenu", (event) => {
   menu.style.top = `${Math.max(4, y)}px`;
 });
 
+function randomMotion(): void {
+  if (!live2dHandle || live2dHandle.motions.length === 0) {
+    showBubble("这个模型没有可用动作");
+    return;
+  }
+  const groups = live2dHandle.motions;
+  const group = groups[Math.floor(Math.random() * groups.length)] ?? groups[0];
+  if (group) live2dHandle.playMotion(group);
+  showBubble(`动作：${group ?? "默认"}`);
+}
+
+function randomExpression(): void {
+  if (!live2dHandle || live2dHandle.expressions === 0) {
+    showBubble("这个模型没有表情");
+    return;
+  }
+  live2dHandle.playExpression(Math.floor(Math.random() * live2dHandle.expressions));
+  showBubble("换了个表情");
+}
+
 menu.addEventListener("click", (event) => {
   const target = (event.target as HTMLElement).closest<HTMLButtonElement>("button");
   const action = target?.dataset.action;
   hideMenu();
   if (action === "chat") void invoke("pet_open_main");
+  else if (action === "motion") randomMotion();
+  else if (action === "expression") randomExpression();
   else if (action === "pat") {
     stage.classList.add("is-patting");
     showBubble("嘿嘿，摸头会害羞的");
