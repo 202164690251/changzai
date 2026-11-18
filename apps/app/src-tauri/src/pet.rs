@@ -60,7 +60,7 @@ pub(crate) fn open(app: &AppHandle) -> Result<bool, String> {
 
     let mut builder = WebviewWindowBuilder::new(app, PET_LABEL, WebviewUrl::App("pet.html".into()))
         .title("常在桌宠")
-        .inner_size(if read_mini(app) { 220.0 } else { 280.0 }, if read_mini(app) { 280.0 } else { 300.0 })
+        .inner_size(if read_mini(app) { 220.0 } else { 280.0 }, if read_mini(app) { 200.0 } else { 300.0 })
         .decorations(false)
         .transparent(true)
         .always_on_top(true)
@@ -145,7 +145,7 @@ pub fn pet_send_text(app: AppHandle, text: String) -> Result<bool, String> {
 #[tauri::command]
 pub fn pet_set_mini(app: AppHandle, window: WebviewWindow, mini: bool) -> Result<bool, String> {
     let size = if mini {
-        LogicalSize::new(220.0, 280.0)
+        LogicalSize::new(220.0, 200.0)
     } else {
         LogicalSize::new(280.0, 300.0)
     };
