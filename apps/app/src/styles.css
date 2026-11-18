@@ -2332,3 +2332,18 @@ textarea:focus-visible {
 .crop-cutout input {
   margin-top: 2px;
 }
+/* 桌宠行为设置 */
+.pet-behavior-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--line);
+}
+.pet-behavior-settings .settings-check {
+  margin: 0;
+}
+.pet-behavior-settings .settings-field {
+  margin: 0;
+}

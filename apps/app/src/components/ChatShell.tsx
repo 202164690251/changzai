@@ -137,6 +137,7 @@ export function ChatShell(): ReactElement {
   const voiceBubbleSinceRef = useRef(Date.now());
   const lastVoicedTsRef = useRef(0);
   const [petOpen, setPetOpen] = useState(false);
+  const [reminder, setReminder] = useState(false);
 
   // V2.3 MVP：桌宠窗口与当前聊天状态同步
   useEffect(() => {
@@ -164,13 +165,35 @@ export function ChatShell(): ReactElement {
           ts: last?.ts ?? 0,
           typing,
           talking: tts.speaking,
+          mood: emotion.effective.weather,
+          reminder,
           lastFrom: last?.from ?? "",
         }),
       );
     } catch {
       /* 头像过大或存储不可用时跳过 */
     }
-  }, [activeConversation?.id, activeConversation?.petImage, her.avatar, her.name, messages, tts.speaking, typing]);
+  }, [activeConversation?.id, activeConversation?.petImage, her.avatar, her.name, messages, reminder, tts.speaking, typing, emotion.effective.weather]);
+
+  useEffect(() => {
+    if (!isTauri()) return;
+    if (!tts.speaking) {
+      try {
+        localStorage.setItem("pet.voice.level", "0");
+      } catch {
+        /* 忽略 */
+      }
+      return;
+    }
+    const timer = window.setInterval(() => {
+      try {
+        localStorage.setItem("pet.voice.level", tts.getLevel().toFixed(3));
+      } catch {
+        /* 忽略 */
+      }
+    }, 80);
+    return () => window.clearInterval(timer);
+  }, [tts.getLevel, tts.speaking]);
 
   const handleTogglePet = useCallback(async (): Promise<void> => {
     if (!isTauri()) {
@@ -211,7 +234,6 @@ export function ChatShell(): ReactElement {
   const [safetyBusy, setSafetyBusy] = useState(false);
   const [safetyMessage, setSafetyMessage] = useState<string | null>(null);
   const [messageMenu, setMessageMenu] = useState<{ message: ChatMsg; x: number; y: number } | null>(null);
-  const [reminder, setReminder] = useState(false);
   const [moodOpen, setMoodOpen] = useState(false);
   const [personaStartOpen, setPersonaStartOpen] = useState(false);
   const [styleReview, setStyleReview] = useState<{ id: string; text: string } | null>(null);
