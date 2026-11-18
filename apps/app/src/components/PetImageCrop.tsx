@@ -11,6 +11,8 @@ export interface PetImageCropProps {
   outputSize?: number;
   title?: string;
   description?: string;
+  /** 桌宠图片允许自动去除纯色背景；头像默认不处理 */
+  allowCutout?: boolean;
 }
 
 export function PetImageCrop({
@@ -20,10 +22,12 @@ export function PetImageCrop({
   outputSize = OUTPUT,
   title = "裁剪桌宠图片",
   description = "拖动调整位置，滑块缩放；保存为 512×512 正方形。",
+  allowCutout = false,
 }: PetImageCropProps): ReactElement | null {
   const [image, setImage] = useState<HTMLImageElement | null>(null);
   const [zoom, setZoom] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [cutout, setCutout] = useState(allowCutout);
   const dragRef = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
 
   useEffect(() => {
@@ -92,6 +96,73 @@ export function PetImageCrop({
     dragRef.current = null;
   };
 
+  const removeSolidBackground = (canvas: HTMLCanvasElement): void => {
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    if (!context) return;
+    const { width, height } = canvas;
+    const imageData = context.getImageData(0, 0, width, height);
+    const data = imageData.data;
+    const counts = new Map<number, number>();
+    const quantize = (index: number): number =>
+      ((data[index]! >> 3) << 10) | ((data[index + 1]! >> 3) << 5) | (data[index + 2]! >> 3);
+    for (let x = 0; x < width; x += 2) {
+      for (const y of [0, height - 1]) {
+        if (data[(y * width + x) * 4 + 3]! < 20) continue;
+        const key = quantize((y * width + x) * 4);
+        counts.set(key, (counts.get(key) ?? 0) + 1);
+      }
+    }
+    for (let y = 0; y < height; y += 2) {
+      for (const x of [0, width - 1]) {
+        if (data[(y * width + x) * 4 + 3]! < 20) continue;
+        const key = quantize((y * width + x) * 4);
+        counts.set(key, (counts.get(key) ?? 0) + 1);
+      }
+    }
+    let bgKey = -1;
+    let bgCount = 0;
+    for (const [key, count] of counts) {
+      if (count > bgCount) {
+        bgCount = count;
+        bgKey = key;
+      }
+    }
+    if (bgKey < 0 || bgCount < 20) return;
+    const bgR = ((bgKey >> 10) & 31) * 8 + 4;
+    const bgG = ((bgKey >> 5) & 31) * 8 + 4;
+    const bgB = (bgKey & 31) * 8 + 4;
+    const tolerance = 42;
+    const visited = new Uint8Array(width * height);
+    const queue: number[] = [];
+    const match = (offset: number): boolean => {
+      const r = data[offset]!;
+      const g = data[offset + 1]!;
+      const b = data[offset + 2]!;
+      const a = data[offset + 3]!;
+      return a > 0 && Math.abs(r - bgR) + Math.abs(g - bgG) + Math.abs(b - bgB) <= tolerance;
+    };
+    for (let x = 0; x < width; x += 1) {
+      queue.push(x, (height - 1) * width + x);
+    }
+    for (let y = 0; y < height; y += 1) {
+      queue.push(y * width, y * width + width - 1);
+    }
+    while (queue.length > 0) {
+      const index = queue.pop()!;
+      if (visited[index]) continue;
+      visited[index] = 1;
+      if (!match(index * 4)) continue;
+      data[index * 4 + 3] = 0;
+      const x = index % width;
+      const y = Math.floor(index / width);
+      if (x > 0) queue.push(index - 1);
+      if (x < width - 1) queue.push(index + 1);
+      if (y > 0) queue.push(index - width);
+      if (y < height - 1) queue.push(index + width);
+    }
+    context.putImageData(imageData, 0, 0);
+  };
+
   const apply = (): void => {
     if (!image) return;
     const canvas = document.createElement("canvas");
@@ -103,6 +174,7 @@ export function PetImageCrop({
     const sy = -top / scale;
     const sw = BOX / scale;
     context.drawImage(image, sx, sy, sw, sw, 0, 0, outputSize, outputSize);
+    if (allowCutout && cutout) removeSolidBackground(canvas);
     onApply(canvas.toDataURL("image/png"));
   };
 
@@ -155,6 +227,13 @@ export function PetImageCrop({
           />
           <span>{zoom.toFixed(2)}×</span>
         </label>
+
+        {allowCutout && (
+          <label className="crop-cutout">
+            <input type="checkbox" checked={cutout} onChange={(event) => setCutout(event.target.checked)} />
+            <span>自动去除纯色背景（适合白底插画，复杂背景会保留）</span>
+          </label>
+        )}
 
         <div className="crop-actions">
           <button type="button" className="btn" onClick={onCancel}>

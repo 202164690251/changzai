@@ -163,13 +163,14 @@ export function ChatShell(): ReactElement {
           text,
           ts: last?.ts ?? 0,
           typing,
+          talking: tts.speaking,
           lastFrom: last?.from ?? "",
         }),
       );
     } catch {
       /* 头像过大或存储不可用时跳过 */
     }
-  }, [activeConversation?.id, activeConversation?.petImage, her.avatar, her.name, messages, typing]);
+  }, [activeConversation?.id, activeConversation?.petImage, her.avatar, her.name, messages, tts.speaking, typing]);
 
   const handleTogglePet = useCallback(async (): Promise<void> => {
     if (!isTauri()) {

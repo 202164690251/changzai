@@ -7,6 +7,11 @@ export interface Live2DHandle {
   destroy: () => void;
   resize: () => void;
   tap: () => void;
+  motions: string[];
+  expressions: number;
+  playMotion: (group: string) => void;
+  playExpression: (index: number) => void;
+  setTalking: (talking: boolean) => void;
 }
 
 const CANVAS_SIZE = 200;
@@ -135,15 +140,68 @@ export async function mountLive2D(host: HTMLElement, conversationId: string): Pr
     }
   };
 
+  const settings = model?.internalModel.settings as unknown as {
+    motions?: Record<string, unknown>;
+    expressions?: unknown[];
+  };
+  const motions = Object.keys(settings?.motions ?? {});
+  const expressions = settings?.expressions?.length ?? 0;
+  let talking = false;
+  let mouthTimer: number | null = null;
+
+  const setTalking = (next: boolean): void => {
+    talking = next;
+    if (mouthTimer === null) {
+      mouthTimer = window.setInterval(() => {
+        if (!model) return;
+        try {
+          const value = talking ? 0.05 + Math.abs(Math.sin(Date.now() / 95)) * 0.55 : 0;
+          const core = model.internalModel.coreModel as unknown as {
+            setParameterValueById: (id: string, value: number) => void;
+          };
+          core.setParameterValueById("ParamMouthOpenY", value);
+        } catch {
+          /* 模型没有口型参数 */
+        }
+      }, 80);
+    }
+    if (!next) {
+      try {
+        const core = model?.internalModel.coreModel as unknown as {
+          setParameterValueById: (id: string, value: number) => void;
+        };
+        core?.setParameterValueById("ParamMouthOpenY", 0);
+      } catch {
+        /* 忽略 */
+      }
+    }
+  };
+
+  const playExpression = (index: number): void => {
+    if (!model || expressions === 0) return;
+    try {
+      const result = model.expression(index % expressions);
+      if (result && typeof result.catch === "function") result.catch(() => undefined);
+    } catch {
+      /* 忽略 */
+    }
+  };
+
   // 有 Idle 组的模型自动进入待机；没有就保持第一帧
   play("Idle");
 
   return {
+    motions,
+    expressions,
     resize: fit,
     tap: () => {
       play("Tap");
     },
+    playMotion: play,
+    playExpression,
+    setTalking,
     destroy: () => {
+      if (mouthTimer !== null) window.clearInterval(mouthTimer);
       model?.destroy();
       app.destroy(true);
     },
