@@ -2029,3 +2029,36 @@ textarea:focus-visible {
   font-size: 12px;
   padding: 14px 10px;
 }
+/* V2.1 TTS：文字气泡朗读按钮 */
+.bubble-text {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+}
+.bubble-text-content {
+  min-width: 0;
+  white-space: pre-wrap;
+}
+.bubble-tts {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin: 1px -4px 0 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+  opacity: 0.45;
+  transition: opacity 0.12s ease, color 0.12s ease;
+}
+.bubble-text:hover .bubble-tts,
+.bubble-tts:focus-visible {
+  opacity: 1;
+}
+.bubble-tts:hover {
+  color: var(--green);
+  background: rgba(0, 0, 0, 0.05);
+}

@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent, ReactElement } from "react";
 import { LLM_PROVIDERS, PROACTIVE_PRESETS, findProvider, personaHeadline, describeEmotion, weatherLabel, type EmotionState, type PersonaProfile, type ProactiveDesire, type ProactiveState, type RelationshipProfile } from "@changzai/core";
 import type { ImportState } from "../hooks/useMediaImport.ts";
+import type { VoiceSettings } from "../hooks/useConversations.ts";
 import { readAvatarFile } from "../lib/avatar.ts";
 import { MAX_NAME_LENGTH, displayName, type PersonKey, type Profile } from "../lib/profile.ts";
-import type { DbStats, LlmConfig, MediaKind } from "../lib/tauri.ts";
+import { api, isTauri, type DbStats, type LlmConfig, type MediaKind, type TtsVoice } from "../lib/tauri.ts";
 import { Avatar } from "./Avatar.tsx";
 import { Icon } from "./Icons.tsx";
 
@@ -28,6 +29,11 @@ export interface SettingsDrawerProps {
   llmTest: { ok: boolean; text: string; error: string } | null;
   onSaveLlm: (config: LlmConfig) => void;
   onTestLlm: (config: LlmConfig) => void;
+  voice: VoiceSettings;
+  voiceTesting: boolean;
+  voiceError: string | null;
+  onUpdateVoice: (patch: Partial<VoiceSettings>) => void;
+  onTestVoice: () => void;
   persona: PersonaProfile | null;
   personaBusy: boolean;
   personaMessage: string | null;
@@ -91,6 +97,11 @@ export function SettingsDrawer({
   llmTest,
   onSaveLlm,
   onTestLlm,
+  voice,
+  voiceTesting,
+  voiceError,
+  onUpdateVoice,
+  onTestVoice,
   persona,
   personaBusy,
   personaMessage,
@@ -134,6 +145,7 @@ export function SettingsDrawer({
   const herInputRef = useRef<HTMLInputElement | null>(null);
   const meInputRef = useRef<HTMLInputElement | null>(null);
   const [avatarError, setAvatarError] = useState<string | null>(null);
+  const [ttsVoices, setTtsVoices] = useState<TtsVoice[]>([]);
   const [provider, setProvider] = useState(llmConfig.provider);
   const [baseUrl, setBaseUrl] = useState(llmConfig.baseUrl);
   const [model, setModel] = useState(llmConfig.model);
@@ -169,6 +181,20 @@ export function SettingsDrawer({
     setRelationFacts(relationship.userFacts.join("\n"));
     setRelationNotes(relationship.notes);
   }, [relationship]);
+
+  useEffect(() => {
+    if (!isTauri()) return;
+    let alive = true;
+    void api
+      .ttsVoices()
+      .then((voices) => {
+        if (alive) setTtsVoices(voices);
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   useEffect(() => {
     setProvider(llmConfig.provider);
@@ -413,6 +439,127 @@ export function SettingsDrawer({
             )}
           </section>
 
+
+          <section className="settings-section" aria-labelledby="settings-voice">
+            <header className="settings-section-head">
+              <h3 id="settings-voice">语音朗读</h3>
+            </header>
+            <p className="settings-hint">
+              默认关闭。Windows 本机语音不需要 API Key、完全离线；云 TTS 会把朗读文字发给服务商，需要自备 Key。
+            </p>
+            <div className="settings-form">
+              <label className="settings-check">
+                <input
+                  type="checkbox"
+                  checked={voice.enabled}
+                  onChange={(event) => onUpdateVoice({ enabled: event.target.checked })}
+                />
+                <span>启用 TTS（在 ta 的文字气泡上显示朗读按钮）</span>
+              </label>
+              <label className="settings-check">
+                <input
+                  type="checkbox"
+                  checked={voice.autoSpeak}
+                  onChange={(event) => onUpdateVoice({ autoSpeak: event.target.checked })}
+                />
+                <span>自动朗读 ta 的新回复（默认关闭）</span>
+              </label>
+              <label className="settings-field">
+                <span className="field-label">语音来源</span>
+                <select
+                  className="text-input"
+                  value={voice.provider}
+                  onChange={(event) =>
+                    onUpdateVoice({ provider: event.target.value === "openai" ? "openai" : "windows" })
+                  }
+                >
+                  <option value="windows">Windows 本机（免费 / 离线）</option>
+                  <option value="openai">OpenAI 兼容云 TTS（需 Key）</option>
+                </select>
+              </label>
+              {voice.provider === "windows" ? (
+                <label className="settings-field">
+                  <span className="field-label">系统音色（留空用默认）</span>
+                  <select
+                    className="text-input"
+                    value={voice.voice}
+                    onChange={(event) => onUpdateVoice({ voice: event.target.value })}
+                  >
+                    <option value="">自动（系统默认）</option>
+                    {ttsVoices.map((item) => (
+                      <option key={item.name} value={item.name}>
+                        {item.name}
+                        {item.culture ? ` · ${item.culture}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : (
+                <>
+                  <label className="settings-field">
+                    <span className="field-label">Base URL</span>
+                    <input
+                      className="text-input"
+                      value={voice.baseUrl}
+                      placeholder="https://api.openai.com/v1"
+                      onChange={(event) => onUpdateVoice({ baseUrl: event.target.value })}
+                    />
+                  </label>
+                  <label className="settings-field">
+                    <span className="field-label">TTS 模型</span>
+                    <input
+                      className="text-input"
+                      value={voice.model}
+                      placeholder="tts-1"
+                      onChange={(event) => onUpdateVoice({ model: event.target.value })}
+                    />
+                  </label>
+                  <label className="settings-field">
+                    <span className="field-label">云音色</span>
+                    <input
+                      className="text-input"
+                      value={voice.voice}
+                      placeholder="alloy"
+                      onChange={(event) => onUpdateVoice({ voice: event.target.value })}
+                    />
+                  </label>
+                  <label className="settings-field">
+                    <span className="field-label">TTS API Key</span>
+                    <input
+                      className="text-input"
+                      type="password"
+                      value={voice.apiKey}
+                      placeholder="sk-..."
+                      autoComplete="off"
+                      onChange={(event) => onUpdateVoice({ apiKey: event.target.value })}
+                    />
+                  </label>
+                </>
+              )}
+              <label className="settings-field">
+                <span className="field-label">语速（-10 慢 … 10 快）</span>
+                <input
+                  className="text-input"
+                  type="number"
+                  min={-10}
+                  max={10}
+                  value={voice.rate}
+                  onChange={(event) =>
+                    onUpdateVoice({ rate: Math.min(10, Math.max(-10, Number(event.target.value) || 0)) })
+                  }
+                />
+              </label>
+            </div>
+            <div className="media-actions">
+              <button type="button" className="btn" disabled={voiceTesting} onClick={onTestVoice}>
+                {voiceTesting ? "合成中…" : "试听一句"}
+              </button>
+            </div>
+            {voiceError !== null && <p className="settings-message bad">❌ {voiceError}</p>}
+            <p className="settings-hint">
+              需要“上传对方音频变成她的声音”时，普通 TTS 不够，必须用支持声音克隆的云服务或本地 GPT-SoVITS/CosyVoice；这一版先不做克隆。
+            </p>
+          </section>
           <section className="settings-section" aria-labelledby="settings-persona">
             <header className="settings-section-head">
               <h3 id="settings-persona">人格卡</h3>

@@ -5,6 +5,7 @@ mod media;
 mod safety;
 mod store;
 mod tray;
+mod tts;
 
 use serde::Serialize;
 use tauri::WindowEvent;
@@ -91,6 +92,8 @@ pub fn run() {
             llm::llm_config_save,
             llm::llm_test,
             llm::llm_chat_stream,
+            tts::tts_speak,
+            tts::tts_voices,
             safety::backup_export,
             safety::backup_restore,
             safety::data_destroy,

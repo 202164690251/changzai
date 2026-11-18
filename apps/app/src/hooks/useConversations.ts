@@ -7,6 +7,30 @@ import { api, isTauri } from "../lib/tauri.ts";
 const STORE_KEY = "conversations.v1";
 const ACTIVE_KEY = "conversations.active";
 
+export type TtsProvider = "windows" | "openai";
+
+export interface VoiceSettings {
+  enabled: boolean;
+  autoSpeak: boolean;
+  provider: TtsProvider;
+  voice: string;
+  rate: number;
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+}
+
+export const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
+  enabled: false,
+  autoSpeak: false,
+  provider: "windows",
+  voice: "",
+  rate: 0,
+  baseUrl: "https://api.openai.com/v1",
+  apiKey: "",
+  model: "tts-1",
+};
+
 export interface ConversationSettings {
   llm: LlmConfig;
   proactive: ProactiveState;
@@ -14,6 +38,8 @@ export interface ConversationSettings {
   emotionOverride: MoodOverride | null;
   styleReviewEnabled: boolean;
   styleFeedback: StyleFeedback[];
+  /** V2.1：每个聊天独立的 TTS 设置；旧记录可为空 */
+  voice?: VoiceSettings;
 }
 
 export interface ConversationRecord {

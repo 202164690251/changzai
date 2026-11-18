@@ -14,7 +14,8 @@ import { useOnboarding } from "../hooks/useOnboarding.ts";
 import { usePin } from "../hooks/usePin.ts";
 import { usePersona } from "../hooks/usePersona.ts";
 import { useProactive } from "../hooks/useProactive.ts";
-import { useConversations, type ConversationRecord, type ConversationSettings } from "../hooks/useConversations.ts";
+import { useTts } from "../hooks/useTts.ts";
+import { DEFAULT_VOICE_SETTINGS, useConversations, type ConversationRecord, type ConversationSettings, type VoiceSettings } from "../hooks/useConversations.ts";
 import { useProfile } from "../hooks/useProfile.ts";
 import { useToast } from "../hooks/useToast.ts";
 import { readChatImageFile } from "../lib/avatar.ts";
@@ -88,6 +89,10 @@ export function ChatShell(): ReactElement {
     moodNote: emotion.moodNote,
     onNotice: show,
   });
+  const voiceSettings = activeConversation?.settings?.voice ?? DEFAULT_VOICE_SETTINGS;
+  const tts = useTts(voiceSettings, show);
+  const autoSpokenRef = useRef<Set<string>>(new Set());
+  const autoStartRef = useRef(Date.now());
 
   const [railTab, setRailTab] = useState<RailTab>("chat");
   const [search, setSearch] = useState("");
@@ -622,6 +627,7 @@ export function ChatShell(): ReactElement {
       emotionOverride: emotion.override,
       styleReviewEnabled: styleFeedback.enabled,
       styleFeedback: styleFeedback.feedback,
+      voice: voiceSettings,
     };
     settingsRef.current = settings;
     conversations.update(activeConversation.id, { settings });
@@ -634,7 +640,45 @@ export function ChatShell(): ReactElement {
     proactive.state,
     styleFeedback.enabled,
     styleFeedback.feedback,
+    voiceSettings,
   ]);
+
+  const updateVoice = useCallback(
+    (patch: Partial<VoiceSettings>) => {
+      if (!activeConversation) return;
+      const settings: ConversationSettings = activeConversation.settings ?? {
+        llm: llm.config,
+        proactive: proactive.state,
+        emotion: emotion.state,
+        emotionOverride: emotion.override,
+        styleReviewEnabled: styleFeedback.enabled,
+        styleFeedback: styleFeedback.feedback,
+        voice: voiceSettings,
+      };
+      conversations.update(activeConversation.id, {
+        settings: {
+          ...settings,
+          voice: { ...(settings.voice ?? DEFAULT_VOICE_SETTINGS), ...patch },
+        },
+      });
+    },
+    [activeConversation, conversations, emotion, llm.config, proactive.state, styleFeedback, voiceSettings],
+  );
+
+  // 新回复自动朗读（只朗读本次启动后产生的新消息，避免切换聊天时重读历史）
+  useEffect(() => {
+    if (!voiceSettings.enabled || !voiceSettings.autoSpeak) return;
+    // 流式回复会频繁改同一条消息；等文字安静下来再朗读，避免读半句。
+    const timer = window.setTimeout(() => {
+      const candidate = [...messages]
+        .reverse()
+        .find((message) => message.from === "her" && message.kind === "text" && message.ts >= autoStartRef.current);
+      if (!candidate || candidate.kind !== "text" || autoSpokenRef.current.has(candidate.id)) return;
+      autoSpokenRef.current.add(candidate.id);
+      void tts.speak(candidate.text);
+    }, 650);
+    return () => window.clearTimeout(timer);
+  }, [messages, tts, voiceSettings.autoSpeak, voiceSettings.enabled]);
 
   const handlePickImage = useCallback(
     (file: File) => {
@@ -708,6 +752,10 @@ export function ChatShell(): ReactElement {
           typing={typing}
           onPreview={setPreview}
           onMessageMenu={(message, event) => setMessageMenu({ message, x: event.clientX, y: event.clientY })}
+          canSpeak={voiceSettings.enabled}
+          onSpeak={(text) => {
+            void tts.speak(text);
+          }}
         />
         <Composer
           onSend={handleSend}
@@ -738,6 +786,13 @@ export function ChatShell(): ReactElement {
           llmTest={llmTest}
           onSaveLlm={(config) => {
             void llm.save(config);
+          }}
+          voice={voiceSettings}
+          voiceTesting={tts.generating}
+          voiceError={tts.error}
+          onUpdateVoice={updateVoice}
+          onTestVoice={() => {
+            void tts.test();
           }}
           onTestLlm={() => {
             void handleTestLlm(llm.config);
