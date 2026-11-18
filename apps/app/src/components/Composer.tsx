@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent, KeyboardEvent, ReactElement } from "react";
 import { buildRecordedVoice, type RecordedVoice } from "../lib/voiceRecorder.ts";
+import { stopVoicePlayback } from "../lib/audio.ts";
 import { Icon } from "./Icons.tsx";
 
 const EMOJIS = [
@@ -37,13 +38,23 @@ export interface ComposerProps {
   onPickImage: (file: File) => void;
   onUnavailable: (action: ComposerAction) => void;
   onVoice: (voice: RecordedVoice) => void;
+  onRecordingStart?: () => void;
   voiceBusy?: boolean;
   onNotice?: (message: string) => void;
   insert?: { id: number; text: string } | null;
 }
 
 /** 底部输入区：表情 / 图片 / 文件 / 截图 / 语音 + 多行输入 + 绿色发送。 */
-export function Composer({ onSend, onPickImage, onUnavailable, onVoice, voiceBusy = false, onNotice, insert }: ComposerProps): ReactElement {
+export function Composer({
+  onSend,
+  onPickImage,
+  onUnavailable,
+  onVoice,
+  onRecordingStart,
+  voiceBusy = false,
+  onNotice,
+  insert,
+}: ComposerProps): ReactElement {
   const [draft, setDraft] = useState("");
   const [emojiOpen, setEmojiOpen] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -102,7 +113,11 @@ export function Composer({ onSend, onPickImage, onUnavailable, onVoice, voiceBus
       return;
     }
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      });
+      onRecordingStart?.();
+      stopVoicePlayback();
       const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
         ? "audio/webm;codecs=opus"
         : "audio/webm";

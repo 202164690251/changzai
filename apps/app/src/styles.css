@@ -2135,3 +2135,33 @@ textarea:focus-visible {
   letter-spacing: 0.04em;
   vertical-align: 1px;
 }
+
+/* V2.1 语音气泡下方转写：不弹窗、不遮挡聊天 */
+.voice-bubble-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 100%;
+}
+.voice-bubble-wrap.her {
+  align-items: flex-start;
+}
+.voice-bubble-wrap.me {
+  align-items: flex-end;
+}
+.voice-transcript-inline {
+  max-width: 260px;
+  padding: 3px 5px;
+  border-radius: 5px;
+  color: var(--text-2);
+  background: rgba(0, 0, 0, 0.035);
+  font-size: 12px;
+  line-height: 1.55;
+  text-align: left;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+.voice-transcript-inline.me {
+  text-align: right;
+}
