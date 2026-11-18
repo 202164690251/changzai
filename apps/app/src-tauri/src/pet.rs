@@ -24,8 +24,10 @@ fn write_position(app: &AppHandle, window: &WebviewWindow) -> Result<(), String>
     crate::store::write_setting_at(&dir, POSITION_KEY, &value.to_string())
 }
 
-pub(crate) fn is_open(app: &AppHandle) -> bool {
-    app.get_webview_window(PET_LABEL).is_some()
+
+
+fn emit_visibility(app: &AppHandle, visible: bool) {
+    let _ = app.emit_to("main", "pet://visibility", visible);
 }
 
 pub(crate) fn is_visible(app: &AppHandle) -> bool {
@@ -38,6 +40,7 @@ pub(crate) fn open(app: &AppHandle) -> Result<bool, String> {
     if let Some(window) = app.get_webview_window(PET_LABEL) {
         window.show().map_err(|error| error.to_string())?;
         let _ = window.set_focus();
+        emit_visibility(app, true);
         return Ok(true);
     }
 
@@ -59,6 +62,7 @@ pub(crate) fn open(app: &AppHandle) -> Result<bool, String> {
     }
 
     builder.build().map_err(|error| error.to_string())?;
+    emit_visibility(app, true);
     Ok(true)
 }
 
@@ -66,6 +70,7 @@ pub(crate) fn close(app: &AppHandle) -> Result<bool, String> {
     if let Some(window) = app.get_webview_window(PET_LABEL) {
         window.close().map_err(|error| error.to_string())?;
     }
+    emit_visibility(app, false);
     Ok(true)
 }
 
@@ -73,6 +78,7 @@ pub(crate) fn hide(app: &AppHandle) -> Result<bool, String> {
     if let Some(window) = app.get_webview_window(PET_LABEL) {
         window.hide().map_err(|error| error.to_string())?;
     }
+    emit_visibility(app, false);
     Ok(true)
 }
 
