@@ -179,6 +179,40 @@ export function ChatShell(): ReactElement {
   const [memoryOpen, setMemoryOpen] = useState(false);
   const [insertDraft, setInsertDraft] = useState<{ id: number; text: string } | null>(null);
   const night = new Date().getHours() >= 23 || new Date().getHours() < 7;
+
+  useEffect(() => {
+    if (!isTauri()) return;
+    let unlisten: (() => void) | undefined;
+    void listen<boolean>("pet://visibility", (event) => {
+      setPetOpen(event.payload);
+    }).then((stop) => {
+      unlisten = stop;
+    });
+    return () => {
+      unlisten?.();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isTauri()) return;
+    let unlisten: (() => void) | undefined;
+    void listen("pet://open-chat", () => {
+      setSettingsOpen(false);
+      setRailTab("chat");
+      setSearch("");
+      markRead();
+    }).then((stop) => {
+      unlisten = stop;
+    });
+    return () => {
+      unlisten?.();
+    };
+  }, [markRead]);
+
+  useEffect(() => {
+    if (!settingsOpen || !isTauri()) return;
+    void api.petIsOpen().then(setPetOpen).catch(() => undefined);
+  }, [settingsOpen]);
   const suppressConversationSync = useRef(false);
   const settingsRef = useRef<ConversationSettings | null>(null);
   const defaultConversationChecked = useRef(false);

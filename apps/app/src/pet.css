@@ -12,6 +12,10 @@ body {
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 .pet-body {
   width: 100vw;
   height: 100vh;
