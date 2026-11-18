@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent, ReactElement } from "react";
-import { LLM_PROVIDERS, PROACTIVE_PRESETS, findProvider, personaHeadline, describeEmotion, weatherLabel, type EmotionState, type PersonaProfile, type ProactiveDesire, type ProactiveState, type RelationshipProfile } from "@changzai/core";
+import { LLM_PROVIDERS, PROACTIVE_PRESETS, findProvider, personaHeadline, personaMbti, describeEmotion, weatherLabel, type EmotionState, type PersonaProfile, type ProactiveDesire, type ProactiveState, type RelationshipProfile } from "@changzai/core";
 import type { ImportState } from "../hooks/useMediaImport.ts";
 import type { VoiceSettings } from "../hooks/useConversations.ts";
 import { readAvatarFile } from "../lib/avatar.ts";
@@ -580,7 +580,10 @@ export function SettingsDrawer({
           </section>
           <section className="settings-section" aria-labelledby="settings-persona">
             <header className="settings-section-head">
-              <h3 id="settings-persona">人格卡</h3>
+              <h3 id="settings-persona">
+                人格卡
+                {persona && personaMbti(persona) && <span className="persona-mbti">{personaMbti(persona)}</span>}
+              </h3>
             </header>
             {persona !== null && persona.source.her_messages > 0 ? (
               <>

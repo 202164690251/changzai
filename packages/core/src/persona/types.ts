@@ -42,6 +42,8 @@ export interface PersonaProfile {
   origin?: PersonaOrigin;
   preset_id?: string;
   custom_prompt?: string;
+  /** 参考 MBTI 标签；不是心理测评，主要用于人格卡展示 */
+  mbti?: string;
   built_at: number;
   source: {
     messages: number;

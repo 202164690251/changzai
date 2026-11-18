@@ -1,5 +1,6 @@
 // 左侧会话列表 + 微信式搜索
 import type { MouseEvent, ReactElement } from "react";
+import { personaMbti } from "@changzai/core";
 import type { ConversationRecord } from "../hooks/useConversations.ts";
 import { formatConversationTime } from "../lib/time.ts";
 import { Avatar } from "./Avatar.tsx";

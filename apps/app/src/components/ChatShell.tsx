@@ -19,7 +19,7 @@ import { DEFAULT_VOICE_SETTINGS, useConversations, type ConversationRecord, type
 import { useProfile } from "../hooks/useProfile.ts";
 import { useToast } from "../hooks/useToast.ts";
 import { readChatImageFile } from "../lib/avatar.ts";
-import type { RecordedVoice } from "../lib/voiceRecorder.ts";
+import { buildRecordedVoice, type RecordedVoice } from "../lib/voiceRecorder.ts";
 import { displayName } from "../lib/profile.ts";
 import type { PersonProfile } from "../lib/profile.ts";
 import type { ImportedMediaFile } from "../lib/tauri.ts";
@@ -76,7 +76,7 @@ export function ChatShell(): ReactElement {
   const her = useMemo<PersonProfile>(() => ({ name: herName, avatar: herAvatar }), [herAvatar, herName]);
   const relationship = useRelationship(herName, meName, db.ready);
   const styleFeedback = useStyleFeedback();
-  const { messages, typing, unread, sendText, sendVoice, appendHerVoice, replaceHerVoice, sendImage, appendImported, appendProactive, resetToGreeting, recallLastMessage, deleteMessage, clear, markRead } = useChat({
+  const { messages, typing, unread, sendText, sendVoice, appendHerVoice, replaceHerVoice, updateVoiceText, sendImage, appendImported, appendProactive, resetToGreeting, recallLastMessage, deleteMessage, clear, markRead } = useChat({
     persona: persona.profile,
     llm: llm.config,
     herName,
@@ -111,6 +111,7 @@ export function ChatShell(): ReactElement {
   const [safetyBusy, setSafetyBusy] = useState(false);
   const [safetyMessage, setSafetyMessage] = useState<string | null>(null);
   const [messageMenu, setMessageMenu] = useState<{ message: ChatMsg; x: number; y: number } | null>(null);
+  const [voiceTranscript, setVoiceTranscript] = useState<string | null>(null);
   const [reminder, setReminder] = useState(false);
   const [moodOpen, setMoodOpen] = useState(false);
   const [personaStartOpen, setPersonaStartOpen] = useState(false);
@@ -182,7 +183,7 @@ export function ChatShell(): ReactElement {
     async (preset: PersonaPreset): Promise<void> => {
       const profile = buildPresetPersona(preset, Date.now());
       const relation = buildPresetRelationship(preset, meName);
-      await createConversation(profile, relation, preset.label, preset.greeting);
+      await createConversation(profile, relation, `${preset.label} · ${preset.mbti}`, preset.greeting);
     },
     [createConversation, meName],
   );
@@ -593,6 +594,36 @@ export function ChatShell(): ReactElement {
       }
     },
     [sendVoice, show],
+  );
+
+  const handleVoiceTranscript = useCallback(
+    async (message: ChatMsg): Promise<void> => {
+      if (message.kind !== "voice") return;
+      const existing = message.text?.trim() ?? "";
+      const garbled = existing.length === 0 || existing.includes("�") || existing.includes("锟斤拷");
+      if (!garbled) {
+        setVoiceTranscript(existing);
+        return;
+      }
+      setVoiceBusy(true);
+      try {
+        const blob = await (await fetch(message.dataUrl)).blob();
+        const recorded = await buildRecordedVoice(blob, message.durationSec);
+        const result = await api.sttTranscribe(recorded.wavBase64);
+        const text = result.text.trim();
+        if (!text) {
+          show("这段语音没有识别出文字");
+          return;
+        }
+        updateVoiceText(message.id, text);
+        setVoiceTranscript(text);
+      } catch (error) {
+        show(error instanceof Error ? `语音转写失败：${error.message}` : "语音转写失败");
+      } finally {
+        setVoiceBusy(false);
+      }
+    },
+    [show, updateVoiceText],
   );
 
   const proactive = useProactive({
@@ -1061,6 +1092,18 @@ export function ChatShell(): ReactElement {
                 风格校准
               </button>
             )}
+            {messageMenu.message.kind === "voice" && (
+              <button
+                type="button"
+                onClick={() => {
+                  const message = messageMenu.message;
+                  setMessageMenu(null);
+                  if (message.kind === "voice") void handleVoiceTranscript(message);
+                }}
+              >
+                转文字
+              </button>
+            )}
             <button
               type="button"
               onClick={() => {
@@ -1101,6 +1144,25 @@ export function ChatShell(): ReactElement {
             >
               删除聊天（不可恢复）
             </button>
+          </div>
+        </div>
+      )}
+
+      {voiceTranscript !== null && (
+        <div className="message-menu-backdrop" onClick={() => setVoiceTranscript(null)}>
+          <div className="voice-transcript-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="voice-transcript-head">
+              <b>语音转文字</b>
+              <button type="button" className="icon-btn" aria-label="关闭" onClick={() => setVoiceTranscript(null)}>
+                ×
+              </button>
+            </div>
+            <p>{voiceTranscript}</p>
+            <div className="modal-actions">
+              <button type="button" className="btn" onClick={() => setVoiceTranscript(null)}>
+                关闭
+              </button>
+            </div>
           </div>
         </div>
       )}

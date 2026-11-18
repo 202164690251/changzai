@@ -46,6 +46,8 @@ fn windows_transcribe(bytes: &[u8]) -> Result<SttResult, String> {
     std::fs::write(&path, bytes).map_err(|error| format!("写入录音失败: {error}"))?;
 
     let script = r#"Add-Type -AssemblyName System.Speech
+[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
+$OutputEncoding = [Console]::OutputEncoding
 $rec = $null
 try {
   try {
@@ -121,6 +123,36 @@ fn windows_transcribe(_bytes: &[u8]) -> Result<SttResult, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(windows)]
+    #[test]
+    #[ignore = "requires Windows SAPI voices; run locally with --ignored"]
+    fn chinese_roundtrip_is_utf8() {
+        use std::os::windows::process::CommandExt;
+        use std::process::Command;
+
+        let wav = std::env::temp_dir().join(format!("changzai-stt-roundtrip-{}.wav", std::process::id()));
+        let script = r#"Add-Type -AssemblyName System.Speech
+$s = New-Object System.Speech.Synthesis.SpeechSynthesizer
+try {
+  $s.SelectVoice('Microsoft Huihui Desktop')
+  $s.SetOutputToWaveFile($env:CZ_STT_OUT)
+  $s.Speak('今天天气怎么样')
+} finally { $s.Dispose() }"#;
+        let mut command = Command::new("powershell.exe");
+        command
+            .args(["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script])
+            .env("CZ_STT_OUT", &wav)
+            .creation_flags(0x0800_0000);
+        let status = command.status().expect("generate wav");
+        assert!(status.success());
+        let bytes = std::fs::read(&wav).expect("read wav");
+        let result = super::windows_transcribe(&bytes).expect("transcribe");
+        let _ = std::fs::remove_file(&wav);
+        assert!(!result.text.contains('锟'), "mojibake: {}", result.text);
+        assert!(!result.text.contains('�'), "replacement char: {}", result.text);
+        assert!(result.text.contains("天气") || result.text.contains("今天"), "text: {}", result.text);
+    }
 
     #[test]
     fn rejects_empty_audio() {

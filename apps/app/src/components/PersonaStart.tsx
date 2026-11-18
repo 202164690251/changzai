@@ -34,6 +34,7 @@ const EMPTY_FORM: CustomPersonaForm = {
   dislikes: [],
   boundaries: [],
   advancedPrompt: "",
+  mbti: "",
 };
 
 function formFromPreset(preset: PersonaPreset): CustomPersonaForm {
@@ -49,6 +50,7 @@ function formFromPreset(preset: PersonaPreset): CustomPersonaForm {
   };
   return {
     ...EMPTY_FORM,
+    mbti: preset.mbti,
     identity: preset.summary,
     relation: preset.defaultRelationship,
     tone: toneMap[preset.id] ?? "gentle",
@@ -162,7 +164,10 @@ export function PersonaStart({
                     setMode("preview");
                   }}
                 >
-                  <b>{preset.label}</b>
+                  <b>
+                    {preset.label}
+                    <span className="persona-mbti">{preset.mbti}</span>
+                  </b>
                   <span>{preset.tagline}</span>
                 </button>
               ))}
@@ -174,7 +179,10 @@ export function PersonaStart({
         {mode === "preview" && selected && previewProfile && (
           <div className="persona-start-body">
             <div className="persona-start-title-row">
-              <h2>{selected.label}</h2>
+              <h2>
+                {selected.label}
+                <span className="persona-mbti">{selected.mbti}</span>
+              </h2>
               <button type="button" className="link-btn" onClick={() => setMode("presets")}>
                 换一个
               </button>
@@ -245,6 +253,19 @@ export function PersonaStart({
                     <option value="calm">冷静</option>
                     <option value="sarcastic">毒舌</option>
                     <option value="quiet">安静</option>
+                  </select>
+                </label>
+                <label className="settings-field">
+                  <span className="field-label">参考 MBTI（可选）</span>
+                  <select
+                    className="text-input"
+                    value={form.mbti ?? ""}
+                    onChange={(event) => setForm({ ...form, mbti: event.target.value })}
+                  >
+                    <option value="">不标注</option>
+                    {["INTJ", "INTP", "ENTJ", "ENTP", "INFJ", "INFP", "ENFJ", "ENFP", "ISTJ", "ISFJ", "ESTJ", "ESFJ", "ISTP", "ISFP", "ESTP", "ESFP"].map((mbti) => (
+                      <option key={mbti} value={mbti}>{mbti}</option>
+                    ))}
                   </select>
                 </label>
                 <label className="settings-field">
