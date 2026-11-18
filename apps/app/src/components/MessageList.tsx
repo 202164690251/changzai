@@ -211,7 +211,7 @@ function MessageRow({
   if (message.kind === "image") {
     bubble = <ImageBubble dataUrl={message.dataUrl} name={message.name} side={side} onPreview={onPreview} />;
   } else if (message.kind === "voice") {
-    bubble = <VoiceBubble dataUrl={message.dataUrl} durationSec={message.durationSec} side={side} />;
+    bubble = <VoiceBubble dataUrl={message.dataUrl} durationSec={message.durationSec} side={side} text={message.text} />;
   } else {
     bubble = (
       <TextBubble

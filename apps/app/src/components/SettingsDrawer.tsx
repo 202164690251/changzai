@@ -465,6 +465,21 @@ export function SettingsDrawer({
                 <span>自动朗读 ta 的新回复（默认关闭）</span>
               </label>
               <label className="settings-field">
+                <span className="field-label">ta 用语音气泡回复的概率（0–100%）</span>
+                <input
+                  className="text-input"
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={voice.voiceReplyChance}
+                  onChange={(event) =>
+                    onUpdateVoice({
+                      voiceReplyChance: Math.min(100, Math.max(0, Number(event.target.value) || 0)),
+                    })
+                  }
+                />
+              </label>
+              <label className="settings-field">
                 <span className="field-label">语音来源</span>
                 <select
                   className="text-input"

@@ -53,6 +53,8 @@ export interface VoiceMessage {
   kind: "voice";
   dataUrl: string;
   durationSec: number;
+  /** 语音转写 / 朗读原文；用于无障碍和上下文 */
+  text?: string;
   ts: number;
 }
 
@@ -121,6 +123,9 @@ export interface ChatApi {
   typing: boolean;
   unread: number;
   sendText: (text: string) => void;
+  sendVoice: (dataUrl: string, durationSec: number, transcript: string) => void;
+  appendHerVoice: (dataUrl: string, durationSec: number, transcript: string) => void;
+  replaceHerVoice: (id: string, dataUrl: string, durationSec: number, transcript: string) => void;
   sendImage: (dataUrl: string, name?: string) => void;
   appendImported: (files: ImportedMediaFile[]) => void;
   appendProactive: (text: string) => void;
@@ -422,16 +427,8 @@ export function useChat(options: ChatOptions): ChatApi {
     [clearReplyTimer, nextId, options, persistMessage],
   );
 
-  const sendText = useCallback(
-    (text: string) => {
-      if (typing) return;
-      const value = text.trim();
-      if (value.length === 0) return;
-      const history = messages;
-      const userMessage: ChatMsg = { id: nextId(), from: "me", kind: "text", text: value, ts: Date.now() };
-      setMessages((previous) => [...previous, userMessage]);
-      persistMessage(userMessage);
-      setUnread(0);
+  const respondToUser = useCallback(
+    (value: string, history: ChatMsg[]): void => {
       const persona = options.persona;
       const personaReady =
         persona !== null &&
@@ -446,7 +443,82 @@ export function useChat(options: ChatOptions): ChatApi {
       }
       scheduleReply();
     },
-    [messages, nextId, options, persistMessage, scheduleReply, streamReply, typing],
+    [options, scheduleReply, streamReply],
+  );
+
+  const sendText = useCallback(
+    (text: string) => {
+      if (typing) return;
+      const value = text.trim();
+      if (value.length === 0) return;
+      const history = messages;
+      const userMessage: ChatMsg = { id: nextId(), from: "me", kind: "text", text: value, ts: Date.now() };
+      setMessages((previous) => [...previous, userMessage]);
+      persistMessage(userMessage);
+      setUnread(0);
+      respondToUser(value, history);
+    },
+    [messages, nextId, persistMessage, respondToUser, typing],
+  );
+
+  const sendVoice = useCallback(
+    (dataUrl: string, durationSec: number, transcript: string) => {
+      if (typing) return;
+      const value = transcript.trim();
+      if (value.length === 0) return;
+      const history = messages;
+      const voice: ChatMsg = {
+        id: nextId(),
+        from: "me",
+        kind: "voice",
+        dataUrl,
+        durationSec: Math.max(1, durationSec),
+        text: value,
+        ts: Date.now(),
+      };
+      setMessages((previous) => [...previous, voice]);
+      persistMessage(voice);
+      setUnread(0);
+      respondToUser(value, history);
+    },
+    [messages, nextId, persistMessage, respondToUser, typing],
+  );
+
+  const appendHerVoice = useCallback(
+    (dataUrl: string, durationSec: number, transcript: string) => {
+      const message: ChatMsg = {
+        id: nextId(),
+        from: "her",
+        kind: "voice",
+        dataUrl,
+        durationSec: Math.max(1, durationSec),
+        text: transcript,
+        ts: Date.now(),
+      };
+      setMessages((previous) => [...previous, message]);
+      persistMessage(message);
+      setUnread((previous) => previous + 1);
+    },
+    [nextId, persistMessage],
+  );
+
+  const replaceHerVoice = useCallback(
+    (id: string, dataUrl: string, durationSec: number, transcript: string) => {
+      const message: ChatMsg = {
+        id,
+        from: "her",
+        kind: "voice",
+        dataUrl,
+        durationSec: Math.max(1, durationSec),
+        text: transcript,
+        ts: Date.now(),
+      };
+      setMessages((previous) => previous.map((item) => (item.id === id && item.kind === "text" ? message : item)));
+      deletePersisted(id);
+      persistMessage(message);
+      setUnread((previous) => previous + 1);
+    },
+    [deletePersisted, persistMessage],
   );
 
   const sendImage = useCallback(
@@ -590,6 +662,9 @@ export function useChat(options: ChatOptions): ChatApi {
       typing,
       unread,
       sendText,
+      sendVoice,
+      appendHerVoice,
+      replaceHerVoice,
       sendImage,
       appendImported,
       appendProactive,
@@ -604,6 +679,9 @@ export function useChat(options: ChatOptions): ChatApi {
       typing,
       unread,
       sendText,
+      sendVoice,
+      appendHerVoice,
+      replaceHerVoice,
       sendImage,
       appendImported,
       appendProactive,

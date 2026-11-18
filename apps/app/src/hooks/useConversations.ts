@@ -12,6 +12,8 @@ export type TtsProvider = "windows" | "openai";
 export interface VoiceSettings {
   enabled: boolean;
   autoSpeak: boolean;
+  /** ta 用语音气泡回复的概率 0–100 */
+  voiceReplyChance: number;
   provider: TtsProvider;
   voice: string;
   rate: number;
@@ -23,6 +25,7 @@ export interface VoiceSettings {
 export const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
   enabled: false,
   autoSpeak: false,
+  voiceReplyChance: 30,
   provider: "windows",
   voice: "",
   rate: 0,

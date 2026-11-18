@@ -8,10 +8,11 @@ export interface VoiceBubbleProps {
   dataUrl: string;
   durationSec: number;
   side: "her" | "me";
+  text?: string;
 }
 
 /** 语音气泡：宽度随秒数 60–220px，点击播放/暂停，时长以音频元数据为准。 */
-export function VoiceBubble({ dataUrl, durationSec, side }: VoiceBubbleProps): ReactElement {
+export function VoiceBubble({ dataUrl, durationSec, side, text }: VoiceBubbleProps): ReactElement {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [playing, setPlaying] = useState(false);
   const [duration, setDuration] = useState(durationSec > 0 ? durationSec : 0);
@@ -83,8 +84,8 @@ export function VoiceBubble({ dataUrl, durationSec, side }: VoiceBubbleProps): R
       type="button"
       className={`bubble-voice ${side}${playing ? " is-playing" : ""}`}
       style={{ width }}
-      title={failed ? "语音加载失败" : playing ? "暂停" : "播放"}
-      aria-label={failed ? "语音加载失败" : `语音消息 ${Math.round(seconds)} 秒，点击${playing ? "暂停" : "播放"}`}
+      title={text ? `语音：${text}` : failed ? "语音加载失败" : playing ? "暂停" : "播放"}
+      aria-label={text ? `语音消息 ${Math.round(seconds)} 秒：${text}` : failed ? "语音加载失败" : `语音消息 ${Math.round(seconds)} 秒，点击${playing ? "暂停" : "播放"}`}
       onClick={togglePlayback}
     >
       <span className="voice-icon" aria-hidden="true">
