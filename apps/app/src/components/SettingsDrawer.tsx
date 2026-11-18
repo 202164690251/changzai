@@ -3,11 +3,12 @@ import type { ChangeEvent, ReactElement } from "react";
 import { LLM_PROVIDERS, PROACTIVE_PRESETS, findProvider, personaHeadline, personaMbti, describeEmotion, weatherLabel, type EmotionState, type PersonaProfile, type ProactiveDesire, type ProactiveState, type RelationshipProfile } from "@changzai/core";
 import type { ImportState } from "../hooks/useMediaImport.ts";
 import type { VoiceSettings } from "../hooks/useConversations.ts";
-import { readAvatarFile } from "../lib/avatar.ts";
+import { readAvatarFile, readPetImageFile } from "../lib/avatar.ts";
 import { MAX_NAME_LENGTH, displayName, type PersonKey, type Profile } from "../lib/profile.ts";
 import { api, isTauri, type DbStats, type LlmConfig, type MediaKind, type TtsVoice } from "../lib/tauri.ts";
 import type { ConversationImportStats } from "../hooks/useConversations.ts";
 import { Avatar } from "./Avatar.tsx";
+import { PetImageCrop } from "./PetImageCrop.tsx";
 import { Icon } from "./Icons.tsx";
 
 export interface SettingsDrawerProps {
@@ -159,6 +160,7 @@ export function SettingsDrawer({
   const meInputRef = useRef<HTMLInputElement | null>(null);
   const petImageInputRef = useRef<HTMLInputElement | null>(null);
   const [petImageError, setPetImageError] = useState<string | null>(null);
+  const [petCropSource, setPetCropSource] = useState<string | null>(null);
   const [avatarError, setAvatarError] = useState<string | null>(null);
   const [ttsVoices, setTtsVoices] = useState<TtsVoice[]>([]);
   const [ttsLoading, setTtsLoading] = useState(false);
@@ -387,8 +389,8 @@ export function SettingsDrawer({
                 event.target.value = "";
                 if (!file) return;
                 setPetImageError(null);
-                void readAvatarFile(file)
-                  .then((dataUrl) => onPetImageChange(dataUrl))
+                void readPetImageFile(file)
+                  .then((dataUrl) => setPetCropSource(dataUrl))
                   .catch((error: unknown) =>
                     setPetImageError(error instanceof Error ? error.message : "图片读取失败"),
                   );
@@ -1262,6 +1264,14 @@ export function SettingsDrawer({
           </section>
         </div>
       </section>
+      <PetImageCrop
+        source={petCropSource}
+        onCancel={() => setPetCropSource(null)}
+        onApply={(dataUrl) => {
+          onPetImageChange(dataUrl);
+          setPetCropSource(null);
+        }}
+      />
     </div>
   );
 }
