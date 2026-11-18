@@ -232,8 +232,8 @@ export function useChat(options: ChatOptions): ChatApi {
             /* 跳过损坏的一行 */
           }
         }
-        // chat_load 按 ts DESC 返回；消息列表需要时间正序
-        loaded.reverse();
+        // 不依赖后端返回顺序：始终按时间升序显示，避免历史/新消息交错
+        loaded.sort((a, b) => a.ts - b.ts || a.id.localeCompare(b.id));
         setMessages(loaded);
         setUnread(0);
         counter.current = loaded.length;
