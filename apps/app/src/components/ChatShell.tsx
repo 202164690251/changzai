@@ -157,6 +157,7 @@ export function ChatShell(): ReactElement {
       localStorage.setItem(
         "pet.state",
         JSON.stringify({
+          id: activeConversation?.id,
           name: her.name,
           avatar: activeConversation?.petImage ?? her.avatar,
           text,
