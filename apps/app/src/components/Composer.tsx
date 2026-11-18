@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent, KeyboardEvent, ReactElement } from "react";
+import { buildRecordedVoice, type RecordedVoice } from "../lib/voiceRecorder.ts";
 import { Icon } from "./Icons.tsx";
 
 const EMOJIS = [
@@ -35,16 +36,26 @@ export interface ComposerProps {
   onSend: (text: string) => void;
   onPickImage: (file: File) => void;
   onUnavailable: (action: ComposerAction) => void;
+  onVoice: (voice: RecordedVoice) => void;
+  voiceBusy?: boolean;
+  onNotice?: (message: string) => void;
   insert?: { id: number; text: string } | null;
 }
 
 /** 底部输入区：表情 / 图片 / 文件 / 截图 / 语音 + 多行输入 + 绿色发送。 */
-export function Composer({ onSend, onPickImage, onUnavailable, insert }: ComposerProps): ReactElement {
+export function Composer({ onSend, onPickImage, onUnavailable, onVoice, voiceBusy = false, onNotice, insert }: ComposerProps): ReactElement {
   const [draft, setDraft] = useState("");
   const [emojiOpen, setEmojiOpen] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const composingRef = useRef(false);
+  const [recording, setRecording] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
+  const startedAtRef = useRef(0);
+  const timerRef = useRef<number | null>(null);
 
   const canSend = draft.trim().length > 0;
 
@@ -72,6 +83,75 @@ export function Composer({ onSend, onPickImage, onUnavailable, insert }: Compose
     document.addEventListener("mousedown", handlePointerDown);
     return () => document.removeEventListener("mousedown", handlePointerDown);
   }, [emojiOpen]);
+
+  const stopRecording = (): void => {
+    const recorder = recorderRef.current;
+    if (!recorder || recorder.state === "inactive") return;
+    recorder.stop();
+    setRecording(false);
+    if (timerRef.current !== null) {
+      window.clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  };
+
+  const startRecording = async (): Promise<void> => {
+    if (recording || voiceBusy) return;
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+      onNotice?.("这台电脑的 WebView 不支持录音");
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : "audio/webm";
+      const recorder = new MediaRecorder(stream, { mimeType });
+      streamRef.current = stream;
+      recorderRef.current = recorder;
+      chunksRef.current = [];
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) chunksRef.current.push(event.data);
+      };
+      recorder.onstop = () => {
+        const duration = Math.max(1, Math.round((Date.now() - startedAtRef.current) / 1000));
+        stream.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+        recorderRef.current = null;
+        const blob = new Blob(chunksRef.current, { type: recorder.mimeType || mimeType });
+        chunksRef.current = [];
+        if (blob.size < 200) {
+          onNotice?.("录音太短了，再说一句试试");
+          return;
+        }
+        void buildRecordedVoice(blob, duration)
+          .then((voice) => onVoice(voice))
+          .catch((error: unknown) =>
+            onNotice?.(error instanceof Error ? error.message : "录音处理失败"),
+          );
+      };
+      startedAtRef.current = Date.now();
+      recorder.start();
+      setElapsed(0);
+      setRecording(true);
+      timerRef.current = window.setInterval(() => {
+        const seconds = Math.floor((Date.now() - startedAtRef.current) / 1000);
+        setElapsed(seconds);
+        if (seconds >= 60) stopRecording();
+      }, 250);
+    } catch (error) {
+      onNotice?.(error instanceof Error ? `麦克风没有打开：${error.message}` : "麦克风没有打开");
+    }
+  };
+
+  useEffect(
+    () => () => {
+      if (timerRef.current !== null) window.clearInterval(timerRef.current);
+      if (recorderRef.current?.state === "recording") recorderRef.current.stop();
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+    },
+    [],
+  );
 
   const submit = (): void => {
     if (!canSend) return;
@@ -107,7 +187,7 @@ export function Composer({ onSend, onPickImage, onUnavailable, insert }: Compose
           className="composer-input"
           value={draft}
           rows={1}
-          placeholder="说点什么…"
+          placeholder={recording ? "录音中…再点一下麦克风发送" : "说点什么…"}
           aria-label="输入消息"
           onChange={(event) => setDraft(event.target.value)}
           onKeyDown={handleKeyDown}
@@ -119,6 +199,13 @@ export function Composer({ onSend, onPickImage, onUnavailable, insert }: Compose
           }}
         />
 
+        {recording && (
+          <div className="recording-bar" role="status">
+            <span className="recording-dot" />
+            <span>录音中 {String(Math.floor(elapsed / 60)).padStart(2, "0")}:{String(elapsed % 60).padStart(2, "0")}</span>
+            <span className="recording-hint">说完再点一下麦克风发送</span>
+          </div>
+        )}
         <div className="composer-bar">
           <div className="composer-tools">
             <button
@@ -158,20 +245,28 @@ export function Composer({ onSend, onPickImage, onUnavailable, insert }: Compose
             >
               <Icon name="screenshot" size={20} />
             </button>
-            <button
-              type="button"
-              className="tool-btn"
-              title="语音"
-              aria-label="语音消息"
-              onClick={() => onUnavailable("voice")}
-            >
-              <Icon name="mic" size={21} />
-            </button>
+
           </div>
 
-          <button type="button" className="send-btn" disabled={!canSend} onClick={submit}>
-            发送
-          </button>
+          <div className="composer-send-group">
+            <button
+              type="button"
+              className={`tool-btn mic-btn${recording ? " is-recording" : ""}`}
+              title={recording ? "结束录音并发送" : "录制语音"}
+              aria-label={recording ? "结束录音并发送" : "录制语音"}
+              aria-pressed={recording}
+              disabled={voiceBusy}
+              onClick={() => {
+                if (recording) stopRecording();
+                else void startRecording();
+              }}
+            >
+              <Icon name={recording ? "pause" : "mic"} size={21} />
+            </button>
+            <button type="button" className="send-btn" disabled={!canSend} onClick={submit}>
+              发送
+            </button>
+          </div>
         </div>
 
         {emojiOpen && (

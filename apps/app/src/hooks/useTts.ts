@@ -1,12 +1,18 @@
-// V2.1 TTS 播放：调用 Rust 合成音频，前端用 Audio 播放；不改聊天记录
+// V2.1 TTS：合成音频；可只返回音频（语音气泡）或直接播放（朗读）
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, isTauri } from "../lib/tauri.ts";
 import type { VoiceSettings } from "./useConversations.ts";
+
+export interface SynthesizedVoice {
+  dataUrl: string;
+  durationSec: number;
+}
 
 export interface TtsApi {
   speaking: boolean;
   generating: boolean;
   error: string | null;
+  synthesize: (text: string) => Promise<SynthesizedVoice | null>;
   speak: (text: string) => Promise<boolean>;
   stop: () => void;
   test: () => Promise<boolean>;
@@ -28,17 +34,16 @@ export function useTts(settings: VoiceSettings, onError?: (message: string) => v
     setSpeaking(false);
   }, []);
 
-  const speak = useCallback(
-    async (text: string): Promise<boolean> => {
+  const synthesize = useCallback(
+    async (text: string): Promise<SynthesizedVoice | null> => {
       const value = text.trim();
-      if (!value) return false;
+      if (!value) return null;
       if (!isTauri()) {
         const message = "TTS 只在桌面版可用";
         setError(message);
         onError?.(message);
-        return false;
+        return null;
       }
-      stop();
       setGenerating(true);
       setError(null);
       try {
@@ -51,7 +56,30 @@ export function useTts(settings: VoiceSettings, onError?: (message: string) => v
           apiKey: settings.apiKey,
           model: settings.model,
         });
-        const audio = new Audio(`data:${result.mime};base64,${result.audioBase64}`);
+        return {
+          dataUrl: `data:${result.mime};base64,${result.audioBase64}`,
+          // 真实时长由 VoiceBubble 的音频元数据修正；这里只给一个近似值
+          durationSec: Math.max(1, Math.round(value.length / 5)),
+        };
+      } catch (caught) {
+        const message = caught instanceof Error ? caught.message : String(caught);
+        setError(message);
+        onError?.(`语音合成失败：${message}`);
+        return null;
+      } finally {
+        setGenerating(false);
+      }
+    },
+    [onError, settings],
+  );
+
+  const speak = useCallback(
+    async (text: string): Promise<boolean> => {
+      stop();
+      const voice = await synthesize(text);
+      if (!voice) return false;
+      try {
+        const audio = new Audio(voice.dataUrl);
         audioRef.current = audio;
         audio.addEventListener("ended", () => setSpeaking(false));
         audio.addEventListener("pause", () => setSpeaking(false));
@@ -62,22 +90,17 @@ export function useTts(settings: VoiceSettings, onError?: (message: string) => v
       } catch (caught) {
         const message = caught instanceof Error ? caught.message : String(caught);
         setError(message);
-        onError?.(`朗读失败：${message}`);
+        onError?.(`播放失败：${message}`);
         setSpeaking(false);
         return false;
-      } finally {
-        setGenerating(false);
       }
     },
-    [onError, settings, stop],
+    [onError, stop, synthesize],
   );
 
-  const test = useCallback(
-    () => speak("你来啦，我刚还在想你。"),
-    [speak],
-  );
+  const test = useCallback(() => speak("你来啦，我刚还在想你。"), [speak]);
 
   useEffect(() => () => stop(), [stop]);
 
-  return { speaking, generating, error, speak, stop, test };
+  return { speaking, generating, error, synthesize, speak, stop, test };
 }

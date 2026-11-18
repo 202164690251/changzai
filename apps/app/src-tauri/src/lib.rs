@@ -4,6 +4,7 @@ mod llm;
 mod media;
 mod safety;
 mod store;
+mod stt;
 mod tray;
 mod tts;
 
@@ -92,6 +93,7 @@ pub fn run() {
             llm::llm_config_save,
             llm::llm_test,
             llm::llm_chat_stream,
+            stt::stt_transcribe,
             tts::tts_speak,
             tts::tts_voices,
             safety::backup_export,

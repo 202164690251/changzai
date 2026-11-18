@@ -19,6 +19,7 @@ import { DEFAULT_VOICE_SETTINGS, useConversations, type ConversationRecord, type
 import { useProfile } from "../hooks/useProfile.ts";
 import { useToast } from "../hooks/useToast.ts";
 import { readChatImageFile } from "../lib/avatar.ts";
+import type { RecordedVoice } from "../lib/voiceRecorder.ts";
 import { displayName } from "../lib/profile.ts";
 import type { PersonProfile } from "../lib/profile.ts";
 import type { ImportedMediaFile } from "../lib/tauri.ts";
@@ -75,7 +76,7 @@ export function ChatShell(): ReactElement {
   const her = useMemo<PersonProfile>(() => ({ name: herName, avatar: herAvatar }), [herAvatar, herName]);
   const relationship = useRelationship(herName, meName, db.ready);
   const styleFeedback = useStyleFeedback();
-  const { messages, typing, unread, sendText, sendImage, appendImported, appendProactive, resetToGreeting, recallLastMessage, deleteMessage, clear, markRead } = useChat({
+  const { messages, typing, unread, sendText, sendVoice, appendHerVoice, replaceHerVoice, sendImage, appendImported, appendProactive, resetToGreeting, recallLastMessage, deleteMessage, clear, markRead } = useChat({
     persona: persona.profile,
     llm: llm.config,
     herName,
@@ -89,7 +90,10 @@ export function ChatShell(): ReactElement {
     moodNote: emotion.moodNote,
     onNotice: show,
   });
-  const voiceSettings = activeConversation?.settings?.voice ?? DEFAULT_VOICE_SETTINGS;
+  const voiceSettings = useMemo(
+    () => ({ ...DEFAULT_VOICE_SETTINGS, ...(activeConversation?.settings?.voice ?? {}) }),
+    [activeConversation?.settings?.voice],
+  );
   const tts = useTts(voiceSettings, show);
   const autoSpokenRef = useRef<Set<string>>(new Set());
   const autoStartRef = useRef(Date.now());
@@ -117,6 +121,8 @@ export function ChatShell(): ReactElement {
   const defaultConversationChecked = useRef(false);
   const loadedConversationRef = useRef<string | null>(null);
   const [convMenu, setConvMenu] = useState<{ record: ConversationRecord; x: number; y: number } | null>(null);
+  const [voiceBusy, setVoiceBusy] = useState(false);
+  const voicedReplyRef = useRef<Set<string>>(new Set());
   const [searchResults, setSearchResults] = useState<ConversationSearchResults>({ conversations: [], messages: [] });
 
   useEffect(() => {
@@ -576,6 +582,25 @@ export function ChatShell(): ReactElement {
     [analytics, sendText],
   );
 
+  const handleVoice = useCallback(
+    async (voice: RecordedVoice): Promise<void> => {
+      setVoiceBusy(true);
+      try {
+        const result = await api.sttTranscribe(voice.wavBase64);
+        if (!result.text.trim()) {
+          show("没听清，再说一句试试");
+          return;
+        }
+        sendVoice(voice.audioDataUrl, voice.durationSec, result.text);
+      } catch (error) {
+        show(error instanceof Error ? `语音识别失败：${error.message}` : "语音识别失败");
+      } finally {
+        setVoiceBusy(false);
+      }
+    },
+    [sendVoice, show],
+  );
+
   const proactive = useProactive({
     persona: persona.profile,
     llm: llm.config,
@@ -680,6 +705,24 @@ export function ChatShell(): ReactElement {
     return () => window.clearTimeout(timer);
   }, [messages, tts, voiceSettings.autoSpeak, voiceSettings.enabled]);
 
+  // ta 按概率用语音气泡回复；与自动朗读独立
+  useEffect(() => {
+    const chance = voiceSettings.voiceReplyChance ?? 30;
+    if (!voiceSettings.enabled || chance <= 0) return;
+    const timer = window.setTimeout(() => {
+      const candidate = [...messages]
+        .reverse()
+        .find((message) => message.from === "her" && message.kind === "text" && message.ts >= autoStartRef.current);
+      if (!candidate || candidate.kind !== "text" || voicedReplyRef.current.has(candidate.id)) return;
+      voicedReplyRef.current.add(candidate.id);
+      if (Math.random() * 100 >= chance) return;
+      void tts.synthesize(candidate.text).then((voice) => {
+        if (voice) replaceHerVoice(candidate.id, voice.dataUrl, voice.durationSec, candidate.text);
+      });
+    }, 900);
+    return () => window.clearTimeout(timer);
+  }, [messages, replaceHerVoice, tts, voiceSettings.enabled, voiceSettings.voiceReplyChance]);
+
   const handlePickImage = useCallback(
     (file: File) => {
       void (async () => {
@@ -761,6 +804,11 @@ export function ChatShell(): ReactElement {
           onSend={handleSend}
           onPickImage={handlePickImage}
           onUnavailable={handleUnavailable}
+          onVoice={(voice) => {
+            void handleVoice(voice);
+          }}
+          voiceBusy={voiceBusy}
+          onNotice={show}
           insert={insertDraft}
         />
       </main>

@@ -179,6 +179,11 @@ export interface TtsVoice {
   culture: string;
 }
 
+export interface SttResult {
+  text: string;
+  confidence: number;
+}
+
 export interface LlmTestResult {
   ok: boolean;
   text: string;
@@ -353,6 +358,10 @@ export const api = {
   async ttsVoices(): Promise<TtsVoice[]> {
     requireTauri();
     return invoke<TtsVoice[]>("tts_voices");
+  },
+  async sttTranscribe(audioBase64: string): Promise<SttResult> {
+    requireTauri();
+    return invoke<SttResult>("stt_transcribe", { request: { audioBase64 } });
   },
   /** Step 3：人格卡持久化 */
   async personaSave(persona: unknown): Promise<boolean> {

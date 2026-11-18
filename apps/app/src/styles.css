@@ -833,6 +833,12 @@ textarea:focus-visible {
   color: var(--green);
 }
 
+.composer-send-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .send-btn {
   min-width: 84px;
   height: 28px;
@@ -2061,4 +2067,31 @@ textarea:focus-visible {
 .bubble-tts:hover {
   color: var(--green);
   background: rgba(0, 0, 0, 0.05);
+}
+/* V2.1 录音与语音消息 */
+.mic-btn.is-recording {
+  color: #e5484d;
+  background: rgba(229, 72, 77, 0.1);
+}
+.recording-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 4px 5px;
+  color: var(--text-2);
+  font-size: 12px;
+}
+.recording-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #e5484d;
+  animation: recording-pulse 1s ease-in-out infinite;
+}
+.recording-hint {
+  color: var(--text-3);
+}
+@keyframes recording-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
 }

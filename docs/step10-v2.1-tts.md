@@ -1,7 +1,7 @@
 # V2.1 语音朗读（TTS）方案与进度
 
 - 日期：2026-11-18
-- 状态：开发中（Windows 本机 TTS 已接通）
+- 状态：语音气泡阶段完成（Windows TTS/STT 已接通）
 - 目标：让 ta 的文字回复可以朗读，默认关闭，不改变聊天内容
 
 ## 1. TTS 需不需要云端 API？
@@ -82,6 +82,6 @@
 
 ## 6. 后续
 
-- V2.2：STT 语音输入（麦克风按住说话 → 转写 → 确认发送）；
+- V2.2：声音克隆（ElevenLabs/Azure 或本地 GPT-SoVITS/CosyVoice）；
 - V2.2+：声音克隆（云服务或本地 GPT-SoVITS/CosyVoice）；
 - 虚拟形象 / Live2D 桌宠另开版本，不与 TTS 耦合。
