@@ -112,6 +112,7 @@ pub fn run() {
             pet::pet_save_position,
             pet::pet_send_text,
             pet::pet_set_mini,
+            pet::pet_set_chat_open,
             pet::pet_get_mini,
             safety::pin_enabled
         ])

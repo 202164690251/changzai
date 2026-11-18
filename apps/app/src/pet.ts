@@ -23,8 +23,9 @@ const form = document.getElementById("pet-chat") as HTMLFormElement;
 const input = document.getElementById("pet-input") as HTMLInputElement;
 const mic = document.getElementById("pet-mic") as HTMLButtonElement;
 const quick = document.getElementById("pet-quick") as HTMLElement;
+const panel = document.getElementById("pet-chat-panel") as HTMLElement;
 
-if (!root || !stage || !image || !fallback || !nameEl || !statusEl || !bubble || !menu || !form || !input || !mic || !quick) {
+if (!root || !stage || !image || !fallback || !nameEl || !statusEl || !bubble || !menu || !form || !input || !mic || !quick || !panel) {
   throw new Error("PET_DOM_MISSING");
 }
 
@@ -33,6 +34,7 @@ let lastTs = 0;
 let bubbleTimer: number | null = null;
 let menuOpen = false;
 let mini = false;
+let chatOpen = false;
 let recording = false;
 let recorder: MediaRecorder | null = null;
 let stream: MediaStream | null = null;
@@ -71,6 +73,14 @@ function updateStatus(state: PetState): void {
   statusEl.classList.toggle("is-thinking", Boolean(state.typing));
 }
 
+function setChatOpen(next: boolean): void {
+  if (mini) return;
+  chatOpen = next;
+  panel.hidden = !next;
+  void invoke("pet_set_chat_open", { open: next }).catch(() => undefined);
+  if (next) window.setTimeout(() => input.focus(), 60);
+}
+
 function applyState(): void {
   const state = readState();
   const name = state.name?.trim() || "ta";
@@ -95,10 +105,13 @@ function applyMiniClass(): void {
   document.body.classList.toggle("is-mini", mini);
   const button = menu.querySelector<HTMLButtonElement>('[data-action="mini"]');
   if (button) button.textContent = mini ? "完整模式" : "Mini 模式";
+  panel.hidden = mini || !chatOpen;
 }
 
 async function toggleMini(): Promise<void> {
   mini = !mini;
+  chatOpen = false;
+  panel.hidden = true;
   try {
     await invoke("pet_set_mini", { mini });
   } catch {
@@ -197,10 +210,20 @@ window.addEventListener("mouseup", () => {
 
 stage.addEventListener("click", () => {
   if (menuOpen) return;
-  stage.classList.remove("is-patting");
-  void stage.offsetWidth;
-  stage.classList.add("is-patting");
-  showBubble(LINES[Math.floor(Math.random() * LINES.length)] ?? "在呢");
+  if (mini) {
+    stage.classList.remove("is-patting");
+    void stage.offsetWidth;
+    stage.classList.add("is-patting");
+    showBubble(LINES[Math.floor(Math.random() * LINES.length)] ?? "在呢");
+    return;
+  }
+  setChatOpen(!chatOpen);
+  if (!chatOpen) {
+    stage.classList.remove("is-patting");
+    void stage.offsetWidth;
+    stage.classList.add("is-patting");
+    showBubble(LINES[Math.floor(Math.random() * LINES.length)] ?? "在呢");
+  }
 });
 
 stage.addEventListener("dblclick", () => {
@@ -212,8 +235,10 @@ window.addEventListener("contextmenu", (event) => {
   event.preventDefault();
   menu.hidden = false;
   menuOpen = true;
-  const x = Math.min(event.clientX, window.innerWidth - 140);
-  const y = Math.min(event.clientY, window.innerHeight - 190);
+  const width = menu.offsetWidth;
+  const height = menu.offsetHeight;
+  const x = Math.min(event.clientX, window.innerWidth - width - 6);
+  const y = Math.min(event.clientY, window.innerHeight - height - 6);
   menu.style.left = `${Math.max(4, x)}px`;
   menu.style.top = `${Math.max(4, y)}px`;
 });
