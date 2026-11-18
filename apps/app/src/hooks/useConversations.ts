@@ -50,6 +50,8 @@ export interface ConversationRecord {
   title: string;
   herName: string;
   herAvatar: string | null;
+  /** 桌宠专用图片；空则使用 herAvatar */
+  petImage?: string | null;
   persona: PersonaProfile;
   relationship: RelationshipProfile;
   /** 每个聊天独立：模型/主动消息/情绪/风格校准 */

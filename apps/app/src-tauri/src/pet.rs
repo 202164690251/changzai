@@ -1,9 +1,10 @@
 // V2.3 MVP：独立透明桌宠窗口。静态头像先跑通；Live2D 后续复用同一窗口。
 use serde::Deserialize;
-use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
+use tauri::{AppHandle, Emitter, LogicalSize, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
 const PET_LABEL: &str = "pet";
 const POSITION_KEY: &str = "pet.position";
+const MINI_KEY: &str = "pet.mini";
 
 #[derive(Debug, Clone, Deserialize)]
 struct SavedPosition {
@@ -15,6 +16,19 @@ fn read_position(app: &AppHandle) -> Option<SavedPosition> {
     let dir = crate::store::app_dir(app).ok()?;
     let raw = crate::store::read_setting_at(&dir, POSITION_KEY).ok()??;
     serde_json::from_str(&raw).ok()
+}
+
+fn read_mini(app: &AppHandle) -> bool {
+    crate::store::app_dir(app)
+        .ok()
+        .and_then(|dir| crate::store::read_setting_at(&dir, MINI_KEY).ok().flatten())
+        .map(|value| value == "1")
+        .unwrap_or(false)
+}
+
+fn write_mini(app: &AppHandle, mini: bool) -> Result<(), String> {
+    let dir = crate::store::app_dir(app)?;
+    crate::store::write_setting_at(&dir, MINI_KEY, if mini { "1" } else { "0" })
 }
 
 fn write_position(app: &AppHandle, window: &WebviewWindow) -> Result<(), String> {
@@ -46,7 +60,7 @@ pub(crate) fn open(app: &AppHandle) -> Result<bool, String> {
 
     let mut builder = WebviewWindowBuilder::new(app, PET_LABEL, WebviewUrl::App("pet.html".into()))
         .title("常在桌宠")
-        .inner_size(260.0, 320.0)
+        .inner_size(if read_mini(app) { 180.0 } else { 280.0 }, if read_mini(app) { 180.0 } else { 390.0 })
         .decorations(false)
         .transparent(true)
         .always_on_top(true)
@@ -115,6 +129,34 @@ pub fn pet_is_open(app: AppHandle) -> bool {
 #[tauri::command]
 pub async fn pet_open_main(app: AppHandle) -> Result<bool, String> {
     open_main(&app)
+}
+
+#[tauri::command]
+pub fn pet_send_text(app: AppHandle, text: String) -> Result<bool, String> {
+    let value = text.trim();
+    if value.is_empty() {
+        return Err("说点什么再发".into());
+    }
+    app.emit_to("main", "pet://quick-send", value.to_string())
+        .map_err(|error| error.to_string())?;
+    Ok(true)
+}
+
+#[tauri::command]
+pub fn pet_set_mini(app: AppHandle, window: WebviewWindow, mini: bool) -> Result<bool, String> {
+    let size = if mini {
+        LogicalSize::new(180.0, 180.0)
+    } else {
+        LogicalSize::new(280.0, 390.0)
+    };
+    window.set_size(size).map_err(|error| error.to_string())?;
+    write_mini(&app, mini)?;
+    Ok(true)
+}
+
+#[tauri::command]
+pub fn pet_get_mini(app: AppHandle) -> bool {
+    read_mini(&app)
 }
 
 #[tauri::command]

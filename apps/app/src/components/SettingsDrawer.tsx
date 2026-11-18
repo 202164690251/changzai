@@ -76,6 +76,8 @@ export interface SettingsDrawerProps {
   onRollbackPersona: () => void;
   petOpen: boolean;
   onTogglePet: () => void;
+  petImage: string | null;
+  onPetImageChange: (dataUrl: string | null) => void;
 }
 
 /** 设置抽屉：双方昵称/头像、回忆素材导入、使用说明。 */
@@ -145,9 +147,13 @@ export function SettingsDrawer({
   onRollbackPersona,
   petOpen,
   onTogglePet,
+  petImage,
+  onPetImageChange,
 }: SettingsDrawerProps): ReactElement {
   const herInputRef = useRef<HTMLInputElement | null>(null);
   const meInputRef = useRef<HTMLInputElement | null>(null);
+  const petImageInputRef = useRef<HTMLInputElement | null>(null);
+  const [petImageError, setPetImageError] = useState<string | null>(null);
   const [avatarError, setAvatarError] = useState<string | null>(null);
   const [ttsVoices, setTtsVoices] = useState<TtsVoice[]>([]);
   const [ttsLoading, setTtsLoading] = useState(false);
@@ -334,8 +340,44 @@ export function SettingsDrawer({
                 {petOpen ? "关闭桌宠" : "打开桌宠"}
               </button>
             </div>
+            <div className="pet-image-row">
+              {petImage ? (
+                <img src={petImage} alt="桌宠图片" className="pet-image-preview" />
+              ) : (
+                <span className="pet-image-placeholder">当前使用聊天头像</span>
+              )}
+              <div className="media-actions">
+                <button type="button" className="btn" onClick={() => petImageInputRef.current?.click()}>
+                  选择桌宠图片
+                </button>
+                {petImage && (
+                  <button type="button" className="btn" onClick={() => onPetImageChange(null)}>
+                    用聊天头像
+                  </button>
+                )}
+              </div>
+            </div>
+            {petImageError !== null && <p className="settings-warn">{petImageError}</p>}
+            <input
+              ref={petImageInputRef}
+              type="file"
+              accept="image/*"
+              className="visually-hidden"
+              tabIndex={-1}
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                event.target.value = "";
+                if (!file) return;
+                setPetImageError(null);
+                void readAvatarFile(file)
+                  .then((dataUrl) => onPetImageChange(dataUrl))
+                  .catch((error: unknown) =>
+                    setPetImageError(error instanceof Error ? error.message : "图片读取失败"),
+                  );
+              }}
+            />
             <p className="settings-hint">
-              Live2D 需要单独导入模型文件；这一版先用头像图片跑通窗口与交互，下一阶段再接 Live2D。
+              Live2D 需要单独导入模型文件；这一版先用一张图跑通桌宠，下一阶段再接自动抠图和 Live2D。
             </p>
           </section>
 

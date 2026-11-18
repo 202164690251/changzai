@@ -13,9 +13,26 @@
         <div id="pet-fallback" class="pet-fallback">ta</div>
       </div>
       <div id="pet-name" class="pet-name">ta</div>
+      <div id="pet-status" class="pet-status"><i></i><span>在线</span></div>
+
+      <form id="pet-chat" class="pet-chat">
+        <input id="pet-input" type="text" maxlength="300" placeholder="和 ta 说点什么…" autocomplete="off" />
+        <button id="pet-mic" type="button" class="pet-icon-btn" title="语音输入" aria-label="语音输入">🎙</button>
+        <button type="submit" class="pet-send-btn">发送</button>
+      </form>
+      <div id="pet-quick" class="pet-quick">
+        <button type="button" data-quick="嗯嗯">嗯嗯</button>
+        <button type="button" data-quick="在忙，晚点说">在忙</button>
+        <button type="button" data-quick="怎么啦？">怎么啦</button>
+        <button type="button" data-quick="晚点聊">晚点聊</button>
+      </div>
     </div>
+
     <div id="pet-menu" class="pet-menu" hidden>
       <button type="button" data-action="chat">打开聊天</button>
+      <button type="button" data-action="pat">摸摸头</button>
+      <button type="button" data-action="feed">喂一口</button>
+      <button type="button" data-action="mini">Mini 模式</button>
       <button type="button" data-action="hide">隐藏桌宠</button>
       <button type="button" data-action="close">关闭桌宠</button>
     </div>
