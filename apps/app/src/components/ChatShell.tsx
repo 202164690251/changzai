@@ -23,7 +23,7 @@ import { buildRecordedVoice, type RecordedVoice } from "../lib/voiceRecorder.ts"
 import { displayName } from "../lib/profile.ts";
 import type { PersonProfile } from "../lib/profile.ts";
 import type { ImportedMediaFile } from "../lib/tauri.ts";
-import { api } from "../lib/tauri.ts";
+import { api, isTauri } from "../lib/tauri.ts";
 import { ConversationList, type ConversationSearchResults } from "./ConversationList.tsx";
 import { ChatHeader } from "./ChatHeader.tsx";
 import { Composer, type ComposerAction } from "./Composer.tsx";
@@ -108,6 +108,55 @@ export function ChatShell(): ReactElement {
   const autoStartRef = useRef(Date.now());
   const voiceBubbleSinceRef = useRef(Date.now());
   const lastVoicedTsRef = useRef(0);
+  const [petOpen, setPetOpen] = useState(false);
+
+  // V2.3 MVP：桌宠窗口与当前聊天状态同步
+  useEffect(() => {
+    if (!isTauri()) return;
+    void api.petIsOpen().then(setPetOpen).catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    const last = lastMessageOf(messages);
+    const text = last
+      ? last.kind === "text"
+        ? last.text
+        : last.kind === "voice"
+          ? last.text ?? "语音"
+          : "图片"
+      : "";
+    try {
+      localStorage.setItem(
+        "pet.state",
+        JSON.stringify({
+          name: her.name,
+          avatar: her.avatar,
+          text,
+          ts: last?.ts ?? 0,
+        }),
+      );
+    } catch {
+      /* 头像过大或存储不可用时跳过 */
+    }
+  }, [her.avatar, her.name, messages]);
+
+  const handleTogglePet = useCallback(async (): Promise<void> => {
+    if (!isTauri()) {
+      show("桌宠只在桌面版可用");
+      return;
+    }
+    try {
+      if (petOpen) {
+        await api.petClose();
+        setPetOpen(false);
+      } else {
+        await api.petOpen();
+        setPetOpen(true);
+      }
+    } catch (error) {
+      show(error instanceof Error ? error.message : "桌宠窗口没有打开");
+    }
+  }, [petOpen, show]);
 
   const [railTab, setRailTab] = useState<RailTab>("chat");
   const [search, setSearch] = useState("");
@@ -937,6 +986,10 @@ export function ChatShell(): ReactElement {
           onClearStyleFeedback={styleFeedback.clear}
           onOpenMood={() => setMoodOpen(true)}
           onOpenPersonaStart={() => setPersonaStartOpen(true)}
+          petOpen={petOpen}
+          onTogglePet={() => {
+            void handleTogglePet();
+          }}
           analyticsCounts={analytics.counts}
           analyticsTotal={analytics.total}
           onClearAnalytics={analytics.clear}

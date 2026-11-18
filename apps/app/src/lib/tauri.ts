@@ -359,6 +359,18 @@ export const api = {
     requireTauri();
     return invoke<TtsVoice[]>("tts_voices");
   },
+  async petOpen(): Promise<boolean> {
+    requireTauri();
+    return invoke<boolean>("pet_open");
+  },
+  async petClose(): Promise<boolean> {
+    requireTauri();
+    return invoke<boolean>("pet_close");
+  },
+  async petIsOpen(): Promise<boolean> {
+    requireTauri();
+    return invoke<boolean>("pet_is_open");
+  },
   async sttTranscribe(audioBase64: string): Promise<SttResult> {
     requireTauri();
     return invoke<SttResult>("stt_transcribe", { request: { audioBase64 } });

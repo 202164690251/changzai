@@ -2,6 +2,7 @@ mod db;
 mod http_probe;
 mod llm;
 mod media;
+mod pet;
 mod safety;
 mod store;
 mod stt;
@@ -102,6 +103,13 @@ pub fn run() {
             safety::pin_set,
             safety::pin_verify,
             safety::pin_disable,
+            pet::pet_open,
+            pet::pet_close,
+            pet::pet_hide,
+            pet::pet_is_open,
+            pet::pet_open_main,
+            pet::pet_start_drag,
+            pet::pet_save_position,
             safety::pin_enabled
         ])
         .setup(|app| {

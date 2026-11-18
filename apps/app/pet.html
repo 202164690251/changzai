@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>常在桌宠</title>
+  </head>
+  <body class="pet-body">
+    <div id="pet-root">
+      <div id="pet-bubble" class="pet-bubble" hidden></div>
+      <div id="pet-stage" class="pet-stage" title="单击说话，双击打开聊天，拖动移动">
+        <img id="pet-image" class="pet-image" alt="" draggable="false" />
+        <div id="pet-fallback" class="pet-fallback">ta</div>
+      </div>
+      <div id="pet-name" class="pet-name">ta</div>
+    </div>
+    <div id="pet-menu" class="pet-menu" hidden>
+      <button type="button" data-action="chat">打开聊天</button>
+      <button type="button" data-action="hide">隐藏桌宠</button>
+      <button type="button" data-action="close">关闭桌宠</button>
+    </div>
+    <script type="module" src="/src/pet.ts"></script>
+  </body>
+</html>

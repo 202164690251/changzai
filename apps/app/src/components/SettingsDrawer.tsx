@@ -74,6 +74,8 @@ export interface SettingsDrawerProps {
   onOpenMood: () => void;
   onOpenPersonaStart: () => void;
   onRollbackPersona: () => void;
+  petOpen: boolean;
+  onTogglePet: () => void;
 }
 
 /** 设置抽屉：双方昵称/头像、回忆素材导入、使用说明。 */
@@ -141,6 +143,8 @@ export function SettingsDrawer({
   onClearStyleFeedback,
   onOpenMood,
   onRollbackPersona,
+  petOpen,
+  onTogglePet,
 }: SettingsDrawerProps): ReactElement {
   const herInputRef = useRef<HTMLInputElement | null>(null);
   const meInputRef = useRef<HTMLInputElement | null>(null);
@@ -316,6 +320,23 @@ export function SettingsDrawer({
               </button>
             </div>
             <p className="settings-hint">导入后会按聊天记录自动生成人格卡；可在这里重建。</p>
+          </section>
+
+          <section className="settings-section" aria-labelledby="settings-pet">
+            <header className="settings-section-head">
+              <h3 id="settings-pet">桌宠（V2.3 MVP）</h3>
+            </header>
+            <p className="settings-hint">
+              透明小窗，使用当前聊天头像。单击说话、双击打开聊天、右键菜单、可拖动并记住位置。默认关闭。
+            </p>
+            <div className="media-actions">
+              <button type="button" className="btn primary" onClick={onTogglePet}>
+                {petOpen ? "关闭桌宠" : "打开桌宠"}
+              </button>
+            </div>
+            <p className="settings-hint">
+              Live2D 需要单独导入模型文件；这一版先用头像图片跑通窗口与交互，下一阶段再接 Live2D。
+            </p>
           </section>
 
           <section className="settings-section" aria-labelledby="settings-llm">
