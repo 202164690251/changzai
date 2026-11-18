@@ -158,6 +158,27 @@ export interface LlmConfig {
   temperature: number;
 }
 
+export interface TtsRequest {
+  text: string;
+  provider: "windows" | "openai";
+  voice: string;
+  rate: number;
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+}
+
+export interface TtsResult {
+  audioBase64: string;
+  mime: string;
+  provider: string;
+}
+
+export interface TtsVoice {
+  name: string;
+  culture: string;
+}
+
 export interface LlmTestResult {
   ok: boolean;
   text: string;
@@ -324,6 +345,14 @@ export const api = {
   async llmTest(): Promise<LlmTestResult> {
     requireTauri();
     return invoke<LlmTestResult>("llm_test");
+  },
+  async ttsSpeak(request: TtsRequest): Promise<TtsResult> {
+    requireTauri();
+    return invoke<TtsResult>("tts_speak", { request });
+  },
+  async ttsVoices(): Promise<TtsVoice[]> {
+    requireTauri();
+    return invoke<TtsVoice[]>("tts_voices");
   },
   /** Step 3：人格卡持久化 */
   async personaSave(persona: unknown): Promise<boolean> {

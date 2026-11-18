@@ -20,6 +20,8 @@ export interface MessageListProps {
   typing: boolean;
   onPreview: (image: PreviewImage) => void;
   onMessageMenu?: (message: ChatMsg, event: MouseEvent<HTMLDivElement>) => void;
+  canSpeak?: boolean;
+  onSpeak?: (text: string) => void;
 }
 
 interface VirtualItem {
@@ -38,6 +40,8 @@ export function MessageList({
   typing,
   onPreview,
   onMessageMenu,
+  canSpeak = false,
+  onSpeak,
 }: MessageListProps): ReactElement {
   const listRef = useRef<HTMLDivElement | null>(null);
   const rowRefs = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -168,6 +172,8 @@ export function MessageList({
                   me={me}
                   onPreview={onPreview}
                   onMessageMenu={onMessageMenu}
+                  canSpeak={canSpeak}
+                  onSpeak={onSpeak}
                 />
               )}
             </div>
@@ -184,9 +190,19 @@ interface MessageRowProps {
   me: PersonProfile;
   onPreview: (image: PreviewImage) => void;
   onMessageMenu?: (message: ChatMsg, event: MouseEvent<HTMLDivElement>) => void;
+  canSpeak?: boolean;
+  onSpeak?: (text: string) => void;
 }
 
-function MessageRow({ message, her, me, onPreview, onMessageMenu }: MessageRowProps): ReactElement {
+function MessageRow({
+  message,
+  her,
+  me,
+  onPreview,
+  onMessageMenu,
+  canSpeak = false,
+  onSpeak,
+}: MessageRowProps): ReactElement {
   const mine = message.from === "me";
   const person = mine ? me : her;
   const side = mine ? "me" : "her";
@@ -197,7 +213,14 @@ function MessageRow({ message, her, me, onPreview, onMessageMenu }: MessageRowPr
   } else if (message.kind === "voice") {
     bubble = <VoiceBubble dataUrl={message.dataUrl} durationSec={message.durationSec} side={side} />;
   } else {
-    bubble = <TextBubble text={message.text} side={side} />;
+    bubble = (
+      <TextBubble
+        text={message.text}
+        side={side}
+        canSpeak={canSpeak && !mine}
+        onSpeak={onSpeak ? () => onSpeak(message.text) : undefined}
+      />
+    );
   }
 
   return (

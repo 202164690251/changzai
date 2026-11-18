@@ -567,10 +567,20 @@ export function useChat(options: ChatOptions): ChatApi {
     setMessages([]);
     conversationRef.current = { summary: "", topic: "", turns: 0 };
     if (isTauri()) {
-      void api.chatClear().catch(() => undefined);
+      void (async () => {
+        const rows = await api.chatLoad(2000).catch(() => []);
+        for (const row of rows) {
+          try {
+            const parsed = JSON.parse(row.payload) as ChatMsg & { convId?: string };
+            if ((parsed.convId ?? "default") === conversationId) await api.chatDelete(row.id);
+          } catch {
+            /* 跳过损坏消息 */
+          }
+        }
+      })();
       void api.settingSet(conversationStateKey, JSON.stringify({ summary: "", topic: "", turns: 0 })).catch(() => undefined);
     }
-  }, [clearReplyTimer]);
+  }, [clearReplyTimer, conversationId, conversationStateKey]);
 
   const markRead = useCallback(() => setUnread(0), []);
 

@@ -13,6 +13,7 @@ export type IconName =
   | "file"
   | "screenshot"
   | "mic"
+  | "volume"
   | "play"
   | "pause"
   | "close";
@@ -82,6 +83,13 @@ const ICONS: Record<IconName, ReactNode> = {
       <rect x="9.2" y="3.4" width="5.6" height="10.6" rx="2.8" />
       <path d="M5.9 11.9a6.1 6.1 0 0 0 12.2 0" />
       <path d="M12 18v2.6" />
+    </>
+  ),
+  volume: (
+    <>
+      <path d="M4 9.4h3.2L12 5.7v12.6L7.2 14.6H4z" />
+      <path d="M15.4 9.2a4.2 4.2 0 0 1 0 5.6" />
+      <path d="M17.9 6.7a7.8 7.8 0 0 1 0 10.6" />
     </>
   ),
   play: <path d="M8.6 5.4v13.2l10-6.6z" fill="currentColor" stroke="none" />,
