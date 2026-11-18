@@ -60,7 +60,7 @@ pub(crate) fn open(app: &AppHandle) -> Result<bool, String> {
 
     let mut builder = WebviewWindowBuilder::new(app, PET_LABEL, WebviewUrl::App("pet.html".into()))
         .title("常在桌宠")
-        .inner_size(if read_mini(app) { 180.0 } else { 280.0 }, if read_mini(app) { 180.0 } else { 390.0 })
+        .inner_size(if read_mini(app) { 210.0 } else { 280.0 }, if read_mini(app) { 230.0 } else { 300.0 })
         .decorations(false)
         .transparent(true)
         .always_on_top(true)
@@ -145,9 +145,9 @@ pub fn pet_send_text(app: AppHandle, text: String) -> Result<bool, String> {
 #[tauri::command]
 pub fn pet_set_mini(app: AppHandle, window: WebviewWindow, mini: bool) -> Result<bool, String> {
     let size = if mini {
-        LogicalSize::new(180.0, 180.0)
+        LogicalSize::new(210.0, 230.0)
     } else {
-        LogicalSize::new(280.0, 390.0)
+        LogicalSize::new(280.0, 300.0)
     };
     window.set_size(size).map_err(|error| error.to_string())?;
     write_mini(&app, mini)?;
@@ -157,6 +157,20 @@ pub fn pet_set_mini(app: AppHandle, window: WebviewWindow, mini: bool) -> Result
 #[tauri::command]
 pub fn pet_get_mini(app: AppHandle) -> bool {
     read_mini(&app)
+}
+
+#[tauri::command]
+pub fn pet_set_chat_open(app: AppHandle, window: WebviewWindow, open: bool) -> Result<bool, String> {
+    if read_mini(&app) {
+        return Ok(false);
+    }
+    let size = if open {
+        LogicalSize::new(280.0, 390.0)
+    } else {
+        LogicalSize::new(280.0, 300.0)
+    };
+    window.set_size(size).map_err(|error| error.to_string())?;
+    Ok(true)
 }
 
 #[tauri::command]
