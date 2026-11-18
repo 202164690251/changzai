@@ -48,10 +48,13 @@ let live2dHandle: {
   playMotion: (group: string) => void;
   playExpression: (index: number) => void;
   setTalking: (talking: boolean) => void;
+  focus: (x: number, y: number) => void;
 } | null = null;
 let live2dId: string | null = null;
 let live2dChecked: string | null = null;
 let live2dLoading = false;
+let autoLive2D = true;
+let lastLive2DState: PetState = {};
 
 async function syncLive2D(state: PetState): Promise<void> {
   const id = state.id;
@@ -161,6 +164,7 @@ function showStatic(state: PetState): void {
 
 function applyState(): void {
   const state = readState();
+  lastLive2DState = state;
   const name = state.name?.trim() || "ta";
   nameEl.textContent = name;
   fallback.textContent = name.slice(0, 1);
@@ -182,6 +186,8 @@ function applyMiniClass(): void {
   const button = menu.querySelector<HTMLButtonElement>('[data-action="mini"]');
   if (button) button.textContent = mini ? "完整模式" : "Mini 模式";
   panel.hidden = mini || !chatOpen;
+  const autoButton = menu.querySelector<HTMLButtonElement>('[data-action="auto"]');
+  if (autoButton) autoButton.textContent = `自动动效：${autoLive2D ? "开" : "关"}`;
   live2dHandle?.resize();
 }
 
@@ -284,6 +290,16 @@ stage.addEventListener("mousedown", (event) => {
   downY = event.screenY;
 });
 
+stage.addEventListener("mousemove", (event) => {
+  if (!live2dHandle) return;
+  const rect = stage.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) return;
+  live2dHandle.focus(
+    ((event.clientX - rect.left) / rect.width) * 200,
+    ((event.clientY - rect.top) / rect.height) * 200,
+  );
+});
+
 window.addEventListener("mousemove", (event) => {
   if (!pointerDown || dragStarted) return;
   if (Math.hypot(event.screenX - downX, event.screenY - downY) < 5) return;
@@ -358,11 +374,22 @@ function randomExpression(): void {
   showBubble("换了个表情");
 }
 
+function toggleAuto(): void {
+  autoLive2D = !autoLive2D;
+  try {
+    localStorage.setItem("pet.live2d.auto", autoLive2D ? "1" : "0");
+  } catch {
+    /* 忽略 */
+  }
+  showBubble(autoLive2D ? "自动动效已开启" : "自动动效已暂停");
+}
+
 menu.addEventListener("click", (event) => {
   const target = (event.target as HTMLElement).closest<HTMLButtonElement>("button");
   const action = target?.dataset.action;
   hideMenu();
   if (action === "chat") void invoke("pet_open_main");
+  else if (action === "auto") toggleAuto();
   else if (action === "motion") randomMotion();
   else if (action === "expression") randomExpression();
   else if (action === "pat") {
@@ -375,7 +402,25 @@ menu.addEventListener("click", (event) => {
 });
 
 window.addEventListener("storage", (event) => {
-  if (event.key === "pet.state") applyState();
+  if (event.key === "pet.state") try {
+  const savedAuto = localStorage.getItem("pet.live2d.auto");
+  if (savedAuto !== null) autoLive2D = savedAuto === "1";
+} catch {
+  /* 忽略 */
+}
+
+window.setInterval(() => {
+  if (!live2dHandle || !autoLive2D || lastLive2DState.talking) return;
+  const groups = live2dHandle.motions;
+  if (groups.length === 0) return;
+  const idle = groups.find((group) => /idle/i.test(group)) ?? groups[0];
+  if (idle) live2dHandle.playMotion(idle);
+  if (live2dHandle.expressions > 0 && Math.random() < 0.3) {
+    live2dHandle.playExpression(Math.floor(Math.random() * live2dHandle.expressions));
+  }
+}, 12000);
+
+applyState();
   if (event.key === "pet.live2d.rev") {
     live2dHandle?.destroy();
     live2dHandle = null;
