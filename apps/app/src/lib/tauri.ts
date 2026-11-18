@@ -401,9 +401,12 @@ export const api = {
     return invoke<boolean>("chat_clear");
   },
 
-  async messagesLoad(limit?: number): Promise<ImportMessageRow[]> {
+  async messagesLoad(limit?: number, convId?: string | null): Promise<ImportMessageRow[]> {
     requireTauri();
-    return invoke<ImportMessageRow[]>("messages_load", { limit: limit ?? null });
+    return invoke<ImportMessageRow[]>("messages_load", {
+      limit: limit ?? null,
+      convId: convId ?? null,
+    });
   },
   /** Step 4：通用 setting 读写（情绪状态/统计事件等） */
   async settingGet(key: string): Promise<string | null> {
@@ -415,13 +418,13 @@ export const api = {
     return invoke<boolean>("setting_set", { key, value });
   },
   /** Step 4：记忆重建 / 检索（SQLite memory + FTS5 trigram） */
-  async memoryRebuild(): Promise<number> {
+  async memoryRebuild(scope?: string | null): Promise<number> {
     requireTauri();
-    return invoke<number>("memory_rebuild");
+    return invoke<number>("memory_rebuild", { scope: scope ?? null });
   },
-  async memorySearch(query: string, limit = 20): Promise<MemoryHit[]> {
+  async memorySearch(query: string, limit = 20, scope?: string | null): Promise<MemoryHit[]> {
     requireTauri();
-    return invoke<MemoryHit[]>("memory_search", { query, limit });
+    return invoke<MemoryHit[]>("memory_search", { query, limit, scope: scope ?? null });
   },
   async backupExport(passphrase: string): Promise<BackupResult> {
     requireTauri();
@@ -451,9 +454,9 @@ export const api = {
     requireTauri();
     return invoke<boolean>("pin_enabled");
   },
-  async memoryCount(): Promise<number> {
+  async memoryCount(scope?: string | null): Promise<number> {
     requireTauri();
-    return invoke<number>("memory_count");
+    return invoke<number>("memory_count", { scope: scope ?? null });
   },
   /** Step 3：流式对话；onEvent 先于 Promise resolve 收到 delta */
   async llmChatStream(

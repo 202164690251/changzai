@@ -398,7 +398,11 @@ pub(crate) fn write_setting_at(dir: &Path, key: &str, value: &str) -> Result<(),
     Ok(())
 }
 
-fn messages_load_at(dir: &Path, limit: usize) -> Result<Vec<ImportMessage>, String> {
+fn messages_load_at(
+    dir: &Path,
+    limit: usize,
+    conv_id: Option<&str>,
+) -> Result<Vec<ImportMessage>, String> {
     let conn = open_at(dir)?;
     if !table_exists(&conn, "message")? {
         return Ok(Vec::new());
@@ -408,11 +412,13 @@ fn messages_load_at(dir: &Path, limit: usize) -> Result<Vec<ImportMessage>, Stri
         .prepare(
             "SELECT id, conv_id, ts, sender, type, content, media_path, reply_to,
                     latency_s, burst_index, burst_size, is_holdout
-             FROM message ORDER BY ts ASC LIMIT ?1",
+             FROM message
+             WHERE (?1 IS NULL OR conv_id = ?1)
+             ORDER BY ts ASC LIMIT ?2",
         )
         .map_err(|e| e.to_string())?;
     let rows = statement
-        .query_map(params![limit], |row| {
+        .query_map(params![conv_id, limit], |row| {
             Ok(ImportMessage {
                 id: row.get(0)?,
                 conv_id: row.get(1)?,
@@ -679,7 +685,7 @@ pub struct MemoryHit {
     pub score: f64,
 }
 
-fn memory_rebuild_at(dir: &Path) -> Result<i64, String> {
+fn memory_rebuild_at(dir: &Path, scope: Option<&str>) -> Result<i64, String> {
     let mut conn = open_at(dir)?;
     if !table_exists(&conn, "memory")? {
         return Err("数据库尚未初始化".to_string());
@@ -689,11 +695,12 @@ fn memory_rebuild_at(dir: &Path) -> Result<i64, String> {
             .prepare(
                 "SELECT id, sender, content, ts FROM message
                  WHERE is_holdout = 0 AND type = 'text' AND length(content) >= 2
+                   AND (?1 IS NULL OR conv_id = ?1)
                  ORDER BY ts ASC LIMIT 20000",
             )
             .map_err(|e| e.to_string())?;
         let mapped = statement
-            .query_map([], |row| {
+            .query_map(params![scope], |row| {
                 Ok((
                     row.get::<_, String>(0)?,
                     row.get::<_, String>(1)?,
@@ -709,8 +716,9 @@ fn memory_rebuild_at(dir: &Path) -> Result<i64, String> {
         out
     };
 
+    let scope_key = scope.unwrap_or("persona_default");
     let tx = conn.transaction().map_err(|e| e.to_string())?;
-    tx.execute("DELETE FROM memory WHERE persona_id = 'persona_default'", [])
+    tx.execute("DELETE FROM memory WHERE persona_id = ?1", params![scope_key])
         .map_err(|e| e.to_string())?;
     let mut inserted = 0i64;
     for (id, sender, content, ts) in rows {
@@ -724,8 +732,8 @@ fn memory_rebuild_at(dir: &Path) -> Result<i64, String> {
             "INSERT OR REPLACE INTO memory(
                 id, persona_id, episode_id, text, emotion_valence, emotion_tag,
                 importance, last_access_ts, access_count
-             ) VALUES (?1, 'persona_default', NULL, ?2, NULL, NULL, ?3, ?4, 0)",
-            params![format!("mem_{id}"), text, importance, ts],
+             ) VALUES (?1, ?5, NULL, ?2, NULL, NULL, ?3, ?4, 0)",
+            params![format!("mem_{id}"), text, importance, ts, scope_key],
         )
         .map_err(|e| e.to_string())?;
         inserted += 1;
@@ -734,7 +742,12 @@ fn memory_rebuild_at(dir: &Path) -> Result<i64, String> {
     Ok(inserted)
 }
 
-fn memory_search_at(dir: &Path, query: &str, limit: usize) -> Result<Vec<MemoryHit>, String> {
+fn memory_search_at(
+    dir: &Path,
+    query: &str,
+    limit: usize,
+    scope: Option<&str>,
+) -> Result<Vec<MemoryHit>, String> {
     let conn = open_at(dir)?;
     if !table_exists(&conn, "memory")? {
         return Ok(Vec::new());
@@ -744,6 +757,7 @@ fn memory_search_at(dir: &Path, query: &str, limit: usize) -> Result<Vec<MemoryH
     if q.is_empty() {
         return Ok(Vec::new());
     }
+    let scope_key = scope.unwrap_or("persona_default");
 
     // trigram FTS5 对 <3 字符的查询无结果，短查询走 LIKE
     if q.chars().count() >= 3 {
@@ -754,11 +768,11 @@ fn memory_search_at(dir: &Path, query: &str, limit: usize) -> Result<Vec<MemoryH
                         bm25(memory_fts) AS rank
                  FROM memory_fts
                  JOIN memory m ON m.rowid = memory_fts.rowid
-                 WHERE memory_fts MATCH ?1
+                 WHERE memory_fts MATCH ?1 AND m.persona_id = ?3
                  ORDER BY rank
                  LIMIT ?2",
             )?;
-            let rows = statement.query_map(params![fts_query, limit], |row| {
+            let rows = statement.query_map(params![fts_query, limit, scope_key], |row| {
                 Ok(MemoryHit {
                     id: row.get(0)?,
                     text: row.get(1)?,
@@ -785,12 +799,12 @@ fn memory_search_at(dir: &Path, query: &str, limit: usize) -> Result<Vec<MemoryH
     let mut statement = conn
         .prepare(
             "SELECT id, text, last_access_ts, importance, emotion_valence
-             FROM memory WHERE text LIKE ?1
+             FROM memory WHERE text LIKE ?1 AND persona_id = ?3
              ORDER BY importance DESC LIMIT ?2",
         )
         .map_err(|e| e.to_string())?;
     let rows = statement
-        .query_map(params![pattern, limit], |row| {
+        .query_map(params![pattern, limit, scope_key], |row| {
             Ok(MemoryHit {
                 id: row.get(0)?,
                 text: row.get(1)?,
@@ -808,37 +822,50 @@ fn memory_search_at(dir: &Path, query: &str, limit: usize) -> Result<Vec<MemoryH
     Ok(out)
 }
 
-fn memory_count_at(dir: &Path) -> Result<i64, String> {
+fn memory_count_at(dir: &Path, scope: Option<&str>) -> Result<i64, String> {
     let conn = open_at(dir)?;
     if !table_exists(&conn, "memory")? {
         return Ok(0);
     }
-    conn.query_row("SELECT count(*) FROM memory", [], |row| row.get(0))
-        .map_err(|e| e.to_string())
+    conn.query_row(
+        "SELECT count(*) FROM memory WHERE persona_id = ?1",
+        params![scope.unwrap_or("persona_default")],
+        |row| row.get(0),
+    )
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub fn memory_rebuild(app: tauri::AppHandle) -> Result<i64, String> {
+pub fn memory_rebuild(app: tauri::AppHandle, scope: Option<String>) -> Result<i64, String> {
     let dir = app_dir(&app)?;
-    memory_rebuild_at(&dir)
+    memory_rebuild_at(&dir, scope.as_deref())
 }
 
 #[tauri::command]
-pub fn memory_search(app: tauri::AppHandle, query: String, limit: Option<usize>) -> Result<Vec<MemoryHit>, String> {
+pub fn memory_search(
+    app: tauri::AppHandle,
+    query: String,
+    limit: Option<usize>,
+    scope: Option<String>,
+) -> Result<Vec<MemoryHit>, String> {
     let dir = app_dir(&app)?;
-    memory_search_at(&dir, &query, limit.unwrap_or(20))
+    memory_search_at(&dir, &query, limit.unwrap_or(20), scope.as_deref())
 }
 
 #[tauri::command]
-pub fn memory_count(app: tauri::AppHandle) -> Result<i64, String> {
+pub fn memory_count(app: tauri::AppHandle, scope: Option<String>) -> Result<i64, String> {
     let dir = app_dir(&app)?;
-    memory_count_at(&dir)
+    memory_count_at(&dir, scope.as_deref())
 }
 
 #[tauri::command]
-pub fn messages_load(app: tauri::AppHandle, limit: Option<usize>) -> Result<Vec<ImportMessage>, String> {
+pub fn messages_load(
+    app: tauri::AppHandle,
+    limit: Option<usize>,
+    conv_id: Option<String>,
+) -> Result<Vec<ImportMessage>, String> {
     let dir = app_dir(&app)?;
-    messages_load_at(&dir, limit.unwrap_or(50_000))
+    messages_load_at(&dir, limit.unwrap_or(50_000), conv_id.as_deref())
 }
 
 #[tauri::command]
@@ -1049,15 +1076,15 @@ mod tests {
             read_setting_at(&dir, "persona.profile").expect("persona read"),
             Some("{\"version\":1}".to_string())
         );
-        let loaded_messages = messages_load_at(&dir, 100).expect("messages load");
+        let loaded_messages = messages_load_at(&dir, 100, None).expect("messages load");
         assert_eq!(loaded_messages.len(), 10);
         assert_eq!(loaded_messages[0].id, "m_0");
 
         // Step 4：记忆重建 / FTS5 检索
-        let rebuilt = memory_rebuild_at(&dir).expect("memory rebuild");
+        let rebuilt = memory_rebuild_at(&dir, None).expect("memory rebuild");
         assert_eq!(rebuilt, 9); // holdout 消息不进入记忆
-        assert_eq!(memory_count_at(&dir).expect("memory count"), 9);
-        let hits = memory_search_at(&dir, "第", 5).expect("memory search");
+        assert_eq!(memory_count_at(&dir, None).expect("memory count"), 9);
+        let hits = memory_search_at(&dir, "第", 5, None).expect("memory search");
         assert!(!hits.is_empty());
 
         let _ = fs::remove_dir_all(&dir);

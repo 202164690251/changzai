@@ -45,6 +45,15 @@ export interface ConversationSettings {
   voice?: VoiceSettings;
 }
 
+export interface ConversationImportStats {
+  messages: number;
+  herMessages: number;
+  holdout?: number;
+  spanDays: number;
+  sourceNames?: string[];
+  importedAt: number;
+}
+
 export interface ConversationRecord {
   id: string;
   title: string;
@@ -52,6 +61,10 @@ export interface ConversationRecord {
   herAvatar: string | null;
   /** 桌宠专用图片；空则使用 herAvatar */
   petImage?: string | null;
+  /** 这条聊天对应的导入批次；导入消息的 conv_id 与之一致 */
+  importId?: string;
+  /** 本聊天自己的导入统计；旧版全局导入可能为空 */
+  importStats?: ConversationImportStats;
   persona: PersonaProfile;
   relationship: RelationshipProfile;
   /** 每个聊天独立：模型/主动消息/情绪/风格校准 */
@@ -98,6 +111,40 @@ export interface ConversationsApi {
   setActive: (id: string | null) => void;
 }
 
+function repairLegacyConversations(
+  list: ConversationRecord[],
+): { list: ConversationRecord[]; changed: boolean } {
+  const legacy = list.filter(
+    (item) =>
+      !item.importId &&
+      (item.persona.origin ?? "distilled") === "distilled" &&
+      (item.persona.samples?.length ?? 0) > 0,
+  );
+  if (legacy.length === 0) return { list, changed: false };
+
+  // 旧版只有一个全局 conv_default；把它归给当前/第一个聊天。
+  const owner = legacy[0];
+  if (!owner) return { list, changed: false };
+  let changed = false;
+  const next = list.map((item) => {
+    if (item.importId) return item;
+    if (item.id === owner.id) {
+      changed = true;
+      return { ...item, importId: "conv_default" };
+    }
+    if ((item.persona.origin ?? "distilled") === "distilled" && (item.persona.samples?.length ?? 0) > 0) {
+      // 无法从一条全局 conv_default 里反推属于谁，先清掉串到别的聊天的参考对话
+      changed = true;
+      return {
+        ...item,
+        persona: { ...item.persona, samples: [], episodes: [] },
+      };
+    }
+    return item;
+  });
+  return { list: next, changed };
+}
+
 export function useConversations(dbReady: boolean): ConversationsApi {
   const [items, setItems] = useState<ConversationRecord[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -113,8 +160,13 @@ export function useConversations(dbReady: boolean): ConversationsApi {
         if (!alive) return;
         const parsed: unknown = raw ? JSON.parse(raw) : [];
         const list = Array.isArray(parsed) ? parsed.filter(isConversationRecord) : [];
-        setItems(list);
-        const wanted = activeRaw && list.some((item) => item.id === activeRaw) ? activeRaw : list[0]?.id ?? null;
+        const repaired = repairLegacyConversations(list);
+        setItems(repaired.list);
+        if (repaired.changed) persist(repaired.list);
+        const wanted =
+          activeRaw && repaired.list.some((item) => item.id === activeRaw)
+            ? activeRaw
+            : repaired.list[0]?.id ?? null;
         setActiveId(wanted);
       } catch {
         /* 首次没有会话 */
