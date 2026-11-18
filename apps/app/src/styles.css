@@ -2310,3 +2310,13 @@ textarea:focus-visible {
 .live2d-status .settings-note {
   margin: 0;
 }
+.live2d-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+}
+.live2d-picker select {
+  min-width: 0;
+  flex: 1;
+}

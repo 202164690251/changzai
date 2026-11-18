@@ -75,7 +75,9 @@ pub(crate) fn open(app: &AppHandle) -> Result<bool, String> {
         builder = builder.position(80.0, 80.0);
     }
 
-    builder.build().map_err(|error| error.to_string())?;
+    let window = builder.build().map_err(|error| error.to_string())?;
+    let _ = window.show();
+    let _ = window.set_focus();
     emit_visibility(app, true);
     Ok(true)
 }

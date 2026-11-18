@@ -45,19 +45,51 @@ function relativePath(file: File): string {
   return parts.length > 1 ? parts.slice(1).join("/") : raw;
 }
 
-export async function saveLive2D(conversationId: string, selected: FileList | File[]): Promise<StoredLive2D> {
+export function listLive2DModels(selected: FileList | File[]): string[] {
+  return Array.from(selected)
+    .filter((file) => file.name.endsWith(".model3.json"))
+    .map((file) => relativePath(file));
+}
+
+export async function saveLive2D(
+  conversationId: string,
+  selected: FileList | File[],
+  chosenModelPath?: string,
+): Promise<StoredLive2D> {
   const files = Array.from(selected);
   const total = files.reduce((sum, file) => sum + file.size, 0);
   if (total > 60 * 1024 * 1024) throw new Error("模型文件夹需要小于 60MB");
-  const modelFile = files.find((file) => file.name.endsWith(".model3.json"));
-  if (!modelFile) throw new Error("没有找到 .model3.json；请选择完整模型文件夹");
+  const modelPath = chosenModelPath ?? listLive2DModels(files)[0];
+  if (!modelPath) throw new Error("没有找到 .model3.json；请选择完整模型文件夹");
+  const modelFile = files.find((file) => relativePath(file) === modelPath);
+  if (!modelFile) throw new Error("模型入口文件不完整");
 
-  const modelPath = relativePath(modelFile);
   const map: Record<string, Blob> = {};
+  const runtimeFile = /\.(json|moc3|png|jpe?g|webp|wav|mp3|ogg)$/i;
   for (const file of files) {
-    map[relativePath(file)] = file;
+    const path = relativePath(file);
+    // 只保存运行时资源，忽略 PSD/cmo3/can3/ReadMe 等大文件
+    if (path === modelPath || runtimeFile.test(path)) map[path] = file;
   }
-  if (!map[modelPath]) map[modelPath] = modelFile;
+  const entry = JSON.parse(await modelFile.text()) as { FileReferences?: { Moc?: string; Textures?: string[] } };
+  const refs = entry.FileReferences ?? {};
+  const resolve = (ref: string): string => {
+    const parts = [...modelPath.split("/").slice(0, -1), ...ref.split("/")];
+    const output: string[] = [];
+    for (const part of parts) {
+      if (part === "." || part === "") continue;
+      if (part === "..") output.pop();
+      else output.push(part);
+    }
+    return output.join("/");
+  };
+  const missing = [
+    refs.Moc ? resolve(refs.Moc) : "",
+    ...(refs.Textures ?? []).map(resolve),
+  ].filter((path) => path.length > 0 && !map[path]);
+  if (missing.length > 0) {
+    throw new Error(`模型文件不完整，缺少：${missing.slice(0, 3).join("、")}`);
+  }
 
   const stored: StoredLive2D = {
     id: conversationId,
