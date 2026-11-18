@@ -23,6 +23,8 @@ export type PresetId =
 export interface PersonaPreset {
   id: PresetId;
   label: string;
+  /** 参考 MBTI 标签，用于展示，不是心理测评 */
+  mbti: string;
   tagline: string;
   greeting: string;
   defaultRelationship: RelationshipType;
@@ -65,6 +67,7 @@ export const PERSONA_PRESETS: PersonaPreset[] = [
   {
     id: "gentle",
     label: "温柔克制",
+    mbti: "INFJ",
     tagline: "不抢话，先听你说；关心但不黏",
     greeting: "在的，今天过得怎么样？",
     defaultRelationship: "朋友",
@@ -96,6 +99,7 @@ export const PERSONA_PRESETS: PersonaPreset[] = [
   {
     id: "clingy",
     label: "活泼黏人",
+    mbti: "ENFP",
     tagline: "话多、爱追问、情绪外放",
     greeting: "你来啦！我刚还在想你呢",
     defaultRelationship: "朋友",
@@ -128,6 +132,7 @@ export const PERSONA_PRESETS: PersonaPreset[] = [
   {
     id: "calm",
     label: "理性冷静",
+    mbti: "INTJ",
     tagline: "逻辑清楚、少情绪、给方案",
     greeting: "嗯，我在。想聊什么？",
     defaultRelationship: "朋友",
@@ -156,6 +161,7 @@ export const PERSONA_PRESETS: PersonaPreset[] = [
   {
     id: "tsundere",
     label: "嘴硬心软",
+    mbti: "ISFP",
     tagline: "嘴上嫌弃，实际很在意",
     greeting: "哟，还知道来找我",
     defaultRelationship: "朋友",
@@ -187,6 +193,7 @@ export const PERSONA_PRESETS: PersonaPreset[] = [
   {
     id: "older",
     label: "年上照顾",
+    mbti: "ENFJ",
     tagline: "稳、会照顾人、偶尔说教",
     greeting: "来了？先坐，慢慢说",
     defaultRelationship: "朋友",
@@ -217,6 +224,7 @@ export const PERSONA_PRESETS: PersonaPreset[] = [
   {
     id: "younger",
     label: "年下直球",
+    mbti: "ESFP",
     tagline: "直接、热烈、藏不住",
     greeting: "你终于来了，我等你好久了",
     defaultRelationship: "朋友",
@@ -248,6 +256,7 @@ export const PERSONA_PRESETS: PersonaPreset[] = [
   {
     id: "sarcastic",
     label: "毒舌朋友",
+    mbti: "ENTP",
     tagline: "嘴损但站你这边",
     greeting: "又怎么了，说吧",
     defaultRelationship: "朋友",
@@ -276,6 +285,7 @@ export const PERSONA_PRESETS: PersonaPreset[] = [
   {
     id: "quiet",
     label: "安静倾听",
+    mbti: "INFP",
     tagline: "话少，但每句都在点上",
     greeting: "嗯，我在听",
     defaultRelationship: "朋友",
@@ -311,11 +321,17 @@ export function findPersonaPreset(id: string): PersonaPreset | undefined {
   return PERSONA_PRESETS.find((preset) => preset.id === id);
 }
 
+/** 旧预设人格没有 mbti 字段时，从 preset_id 兜底取展示标签。 */
+export function personaMbti(persona: { mbti?: string; preset_id?: string }): string | undefined {
+  return persona.mbti ?? findPersonaPreset(persona.preset_id ?? "")?.mbti;
+}
+
 export function buildPresetPersona(preset: PersonaPreset, now = Date.now()): PersonaProfile {
   return {
     version: 1,
     origin: "preset",
     preset_id: preset.id,
+    mbti: preset.mbti,
     built_at: now,
     source: { messages: 0, her_messages: 0, span_days: 0 },
     style: preset.style,
@@ -340,6 +356,8 @@ export interface CustomPersonaForm {
   dislikes: string[];
   boundaries: string[];
   advancedPrompt: string;
+  /** 可选：自定义参考 MBTI */
+  mbti?: string;
 }
 
 const TONE_BASE: Record<CustomPersonaForm["tone"], { summary: string; samples: PersonaSample[] }> = {
@@ -401,6 +419,7 @@ export function buildCustomPersona(form: CustomPersonaForm, now = Date.now()): P
     version: 1,
     origin: "custom",
     custom_prompt: form.advancedPrompt.trim() || undefined,
+    mbti: form.mbti?.trim() || undefined,
     built_at: now,
     source: { messages: 0, her_messages: 0, span_days: 0 },
     style: style({
@@ -467,4 +486,4 @@ export function defaultRelationshipForPreset(preset: PersonaPreset): Relationshi
 }
 
 // 避免误用：模板不是心理诊断
-export const PRESET_DISCLAIMER = "这些是聊天风格模板，不是心理诊断或对真人的定义。";
+export const PRESET_DISCLAIMER = "这些是聊天风格模板，MBTI 只是参考标签，不是心理诊断或对真人的定义。";

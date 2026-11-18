@@ -2095,3 +2095,43 @@ textarea:focus-visible {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.35; }
 }
+/* V2.1 语音转文字 */
+.voice-transcript-modal {
+  width: min(420px, calc(100vw - 40px));
+  margin: 22vh auto 0;
+  padding: 16px;
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.18);
+}
+.voice-transcript-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  font-size: 14px;
+}
+.voice-transcript-modal p {
+  max-height: 40vh;
+  overflow: auto;
+  margin: 0 0 12px;
+  color: var(--text);
+  line-height: 1.7;
+  font-size: 14px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* V2.0 MBTI 参考标签 */
+.persona-mbti {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: #eef7f2;
+  color: var(--green-dark);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  vertical-align: 1px;
+}

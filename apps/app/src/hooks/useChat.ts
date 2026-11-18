@@ -60,6 +60,13 @@ export interface VoiceMessage {
 
 export type ChatMsg = TextMessage | ImageMessage | VoiceMessage;
 
+/** 文本或语音转写，用于上下文/摘要；图片没有可进入 prompt 的文字。 */
+function messageText(message: ChatMsg): string {
+  if (message.kind === "text") return message.text;
+  if (message.kind === "voice") return message.text ?? "";
+  return "";
+}
+
 /** 演示对话的起止时间：2023-05-20 14:03（本地时区）。 */
 const DEMO_START = new Date(2023, 4, 20, 14, 3, 0).getTime();
 
@@ -126,6 +133,7 @@ export interface ChatApi {
   sendVoice: (dataUrl: string, durationSec: number, transcript: string) => void;
   appendHerVoice: (dataUrl: string, durationSec: number, transcript: string) => void;
   replaceHerVoice: (id: string, dataUrl: string, durationSec: number, transcript: string) => void;
+  updateVoiceText: (id: string, transcript: string) => void;
   sendImage: (dataUrl: string, name?: string) => void;
   appendImported: (files: ImportedMediaFile[]) => void;
   appendProactive: (text: string) => void;
@@ -249,17 +257,16 @@ export function useChat(options: ChatOptions): ChatApi {
 
   // 用最近 8 条生成短摘要：控制上下文长度，同时让重启后的 ta 知道之前在聊什么
   useEffect(() => {
-    const textMessages = messages.filter((message) => message.kind === "text");
-    if (textMessages.length < 2) return;
-    const recent = textMessages.slice(-8).map((message) => {
-      const text = message.kind === "text" ? message.text : "";
-      return `${message.from === "her" ? "ta" : "我"}：${text.slice(0, 80)}`;
+    const transcriptMessages = messages.filter((message) => messageText(message).length > 0);
+    if (transcriptMessages.length < 2) return;
+    const recent = transcriptMessages.slice(-8).map((message) => {
+      return `${message.from === "her" ? "ta" : "我"}：${messageText(message).slice(0, 80)}`;
     });
-    const lastUser = [...textMessages].reverse().find((message) => message.from === "me");
+    const lastUser = [...transcriptMessages].reverse().find((message) => message.from === "me");
     const next = {
       summary: recent.join("；").slice(0, 600),
-      topic: lastUser && lastUser.kind === "text" ? lastUser.text.slice(0, 40) : conversationRef.current.topic,
-      turns: textMessages.filter((message) => message.from === "me").length,
+      topic: lastUser ? messageText(lastUser).slice(0, 40) : conversationRef.current.topic,
+      turns: transcriptMessages.filter((message) => message.from === "me").length,
     };
     conversationRef.current = next;
     if (isTauri()) {
@@ -293,13 +300,10 @@ export function useChat(options: ChatOptions): ChatApi {
       const now = Date.now();
       const decayed = decayEmotion(options.emotion, now);
       const runtimeHistory = history
-        .filter(
-          (message): message is TextMessage =>
-            message.kind === "text" && message.from !== "system",
-        )
+        .filter((message) => message.from !== "system" && messageText(message).length > 0)
         .map((message) => ({
           from: message.from === "her" ? ("her" as const) : ("me" as const),
-          text: message.text,
+          text: messageText(message),
           ts: message.ts,
         }));
       const governorMessages = [...runtimeHistory, { from: "me" as const, text: userText, ts: now }];
@@ -504,6 +508,23 @@ export function useChat(options: ChatOptions): ChatApi {
     [nextId, persistMessage],
   );
 
+  const updateVoiceText = useCallback(
+    (id: string, transcript: string) => {
+      const cleaned = transcript.trim();
+      if (!cleaned) return;
+      const target = messages.find((message) => message.id === id && message.kind === "voice");
+      if (!target || target.kind !== "voice") return;
+      const updated: ChatMsg = { ...target, text: cleaned };
+      setMessages((previous) => previous.map((message) => (message.id === id ? updated : message)));
+      if (isTauri()) {
+        void api
+          .chatAppend(updated.id, updated.ts, JSON.stringify({ ...updated, convId: conversationId }))
+          .catch(() => undefined);
+      }
+    },
+    [conversationId, messages],
+  );
+
   const replaceHerVoice = useCallback(
     (id: string, dataUrl: string, durationSec: number, transcript: string) => {
       const message: ChatMsg = {
@@ -673,6 +694,7 @@ export function useChat(options: ChatOptions): ChatApi {
       sendVoice,
       appendHerVoice,
       replaceHerVoice,
+      updateVoiceText,
       sendImage,
       appendImported,
       appendProactive,
@@ -690,6 +712,7 @@ export function useChat(options: ChatOptions): ChatApi {
       sendVoice,
       appendHerVoice,
       replaceHerVoice,
+      updateVoiceText,
       sendImage,
       appendImported,
       appendProactive,
