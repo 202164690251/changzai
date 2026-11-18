@@ -80,6 +80,23 @@ export async function readAvatarFile(file: File): Promise<string> {
   return shrinkImage(dataUrl, 256, 0.9).catch(() => dataUrl);
 }
 
+/** 桌宠图片：保留透明通道，最长边压到 1024px，供用户选择正方形裁剪范围。 */
+export async function readPetImageFile(file: File): Promise<string> {
+  assertImageFile(file, MAX_AVATAR_BYTES, "图片需要小于 2MB");
+  const dataUrl = await readAsDataUrl(file);
+  const image = await loadImage(dataUrl);
+  const longest = Math.max(image.naturalWidth, image.naturalHeight);
+  if (longest <= 1024) return dataUrl;
+  const scale = 1024 / longest;
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+  canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+  const context = canvas.getContext("2d");
+  if (!context) return dataUrl;
+  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL("image/png");
+}
+
 /** 聊天里发送的本地图片：小于 8MB，最长边压到 1600px。 */
 export async function readChatImageFile(file: File): Promise<string> {
   assertImageFile(file, MAX_CHAT_IMAGE_BYTES, "图片需要小于 8MB");
