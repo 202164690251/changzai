@@ -35,6 +35,11 @@ let bubbleTimer: number | null = null;
 let menuOpen = false;
 let mini = false;
 let chatOpen = false;
+let pointerDown = false;
+let dragStarted = false;
+let suppressClick = false;
+let downX = 0;
+let downY = 0;
 let recording = false;
 let recorder: MediaRecorder | null = null;
 let stream: MediaStream | null = null;
@@ -200,16 +205,33 @@ quick.addEventListener("click", (event) => {
 stage.addEventListener("mousedown", (event) => {
   if (event.button !== 0) return;
   hideMenu();
+  pointerDown = true;
+  dragStarted = false;
+  suppressClick = false;
+  downX = event.screenX;
+  downY = event.screenY;
+});
+
+window.addEventListener("mousemove", (event) => {
+  if (!pointerDown || dragStarted) return;
+  if (Math.hypot(event.screenX - downX, event.screenY - downY) < 5) return;
+  dragStarted = true;
+  suppressClick = true;
   void invoke("pet_start_drag").catch(() => undefined);
 });
 
 window.addEventListener("mouseup", () => {
   if (menuOpen) return;
+  pointerDown = false;
   void invoke("pet_save_position").catch(() => undefined);
 });
 
 stage.addEventListener("click", () => {
   if (menuOpen) return;
+  if (suppressClick) {
+    suppressClick = false;
+    return;
+  }
   if (mini) {
     stage.classList.remove("is-patting");
     void stage.offsetWidth;
