@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactElement } from "react";
 import { DEFAULT_EMOTION, DEFAULT_PROACTIVE_STATE, buildCustomPersona, buildCustomRelationship, buildPresetPersona, buildPresetRelationship, type CustomPersonaForm, type PersonaPreset, type PersonaProfile, type RelationshipProfile } from "@changzai/core";
+import { listen } from "@tauri-apps/api/event";
 import { useChat, lastMessageOf, messagePreview, type ChatMsg } from "../hooks/useChat.ts";
 import { useAnalytics } from "../hooks/useAnalytics.ts";
 import { useDatabase } from "../hooks/useDatabase.ts";
@@ -146,7 +147,9 @@ export function ChatShell(): ReactElement {
       return;
     }
     try {
-      if (petOpen) {
+      // 不以本地 state 为准：托盘隐藏后 state 可能还是旧的
+      const visible = await api.petIsOpen();
+      if (visible) {
         await api.petClose();
         setPetOpen(false);
       } else {
@@ -156,7 +159,7 @@ export function ChatShell(): ReactElement {
     } catch (error) {
       show(error instanceof Error ? error.message : "桌宠窗口没有打开");
     }
-  }, [petOpen, show]);
+  }, [show]);
 
   const [railTab, setRailTab] = useState<RailTab>("chat");
   const [search, setSearch] = useState("");

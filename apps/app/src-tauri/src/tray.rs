@@ -6,8 +6,9 @@ use tauri::{App, Manager};
 
 pub fn setup(app: &mut App) -> tauri::Result<()> {
     let show = MenuItem::with_id(app, "show", "显示窗口", true, None::<&str>)?;
+    let pet = MenuItem::with_id(app, "pet", "显示/隐藏桌宠", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "退出常在", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&show, &quit])?;
+    let menu = Menu::with_items(app, &[&show, &pet, &quit])?;
 
     let mut builder = TrayIconBuilder::new()
         .tooltip("常在 Still Here")
@@ -18,6 +19,13 @@ pub fn setup(app: &mut App) -> tauri::Result<()> {
                 if let Some(window) = app.get_webview_window("main") {
                     let _ = window.show();
                     let _ = window.set_focus();
+                }
+            }
+            "pet" => {
+                if crate::pet::is_visible(app) {
+                    let _ = crate::pet::hide(app);
+                } else {
+                    let _ = crate::pet::open(app);
                 }
             }
             "quit" => app.exit(0),
