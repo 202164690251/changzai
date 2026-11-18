@@ -7,13 +7,33 @@ export interface PetImageCropProps {
   source: string | null;
   onCancel: () => void;
   onApply: (dataUrl: string) => void;
+  /** 输出正方形边长；头像用 256，桌宠用默认 512 */
+  outputSize?: number;
+  title?: string;
+  description?: string;
 }
 
-export function PetImageCrop({ source, onCancel, onApply }: PetImageCropProps): ReactElement | null {
+export function PetImageCrop({
+  source,
+  onCancel,
+  onApply,
+  outputSize = OUTPUT,
+  title = "裁剪桌宠图片",
+  description = "拖动调整位置，滑块缩放；保存为 512×512 正方形。",
+}: PetImageCropProps): ReactElement | null {
   const [image, setImage] = useState<HTMLImageElement | null>(null);
   const [zoom, setZoom] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const dragRef = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
+
+  useEffect(() => {
+    if (!source) return;
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === "Escape") onCancel();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onCancel, source]);
 
   useEffect(() => {
     if (!source) {
@@ -75,14 +95,14 @@ export function PetImageCrop({ source, onCancel, onApply }: PetImageCropProps): 
   const apply = (): void => {
     if (!image) return;
     const canvas = document.createElement("canvas");
-    canvas.width = OUTPUT;
-    canvas.height = OUTPUT;
+    canvas.width = outputSize;
+    canvas.height = outputSize;
     const context = canvas.getContext("2d");
     if (!context) return;
     const sx = -left / scale;
     const sy = -top / scale;
     const sw = BOX / scale;
-    context.drawImage(image, sx, sy, sw, sw, 0, 0, OUTPUT, OUTPUT);
+    context.drawImage(image, sx, sy, sw, sw, 0, 0, outputSize, outputSize);
     onApply(canvas.toDataURL("image/png"));
   };
 
@@ -91,8 +111,8 @@ export function PetImageCrop({ source, onCancel, onApply }: PetImageCropProps): 
       <div className="crop-card">
         <header className="crop-head">
           <div>
-            <h3>裁剪桌宠图片</h3>
-            <p>拖动调整位置，滑块缩放；保存为 512×512 正方形。</p>
+            <h3>{title}</h3>
+            <p>{description}</p>
           </div>
           <button type="button" className="crop-close" onClick={onCancel} aria-label="关闭">
             ×

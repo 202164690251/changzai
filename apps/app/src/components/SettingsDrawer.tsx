@@ -3,7 +3,7 @@ import type { ChangeEvent, ReactElement } from "react";
 import { LLM_PROVIDERS, PROACTIVE_PRESETS, findProvider, personaHeadline, personaMbti, describeEmotion, weatherLabel, type EmotionState, type PersonaProfile, type ProactiveDesire, type ProactiveState, type RelationshipProfile } from "@changzai/core";
 import type { ImportState } from "../hooks/useMediaImport.ts";
 import type { VoiceSettings } from "../hooks/useConversations.ts";
-import { readAvatarFile, readPetImageFile } from "../lib/avatar.ts";
+import { readPetImageFile } from "../lib/avatar.ts";
 import { MAX_NAME_LENGTH, displayName, type PersonKey, type Profile } from "../lib/profile.ts";
 import { api, isTauri, type DbStats, type LlmConfig, type MediaKind, type TtsVoice } from "../lib/tauri.ts";
 import type { ConversationImportStats } from "../hooks/useConversations.ts";
@@ -161,6 +161,7 @@ export function SettingsDrawer({
   const petImageInputRef = useRef<HTMLInputElement | null>(null);
   const [petImageError, setPetImageError] = useState<string | null>(null);
   const [petCropSource, setPetCropSource] = useState<string | null>(null);
+  const [avatarCrop, setAvatarCrop] = useState<{ who: PersonKey; source: string } | null>(null);
   const [avatarError, setAvatarError] = useState<string | null>(null);
   const [ttsVoices, setTtsVoices] = useState<TtsVoice[]>([]);
   const [ttsLoading, setTtsLoading] = useState(false);
@@ -211,19 +212,19 @@ export function SettingsDrawer({
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent): void => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape" && !avatarCrop && !petCropSource) onClose();
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
+  }, [avatarCrop, onClose, petCropSource]);
 
   const handleAvatarFile = async (who: PersonKey, event: ChangeEvent<HTMLInputElement>): Promise<void> => {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
     try {
-      const dataUrl = await readAvatarFile(file);
-      onAvatarChange(who, dataUrl);
+      const dataUrl = await readPetImageFile(file);
+      setAvatarCrop({ who, source: dataUrl });
       setAvatarError(null);
     } catch (error) {
       setAvatarError(error instanceof Error ? error.message : "图片读取失败");
@@ -1264,6 +1265,17 @@ export function SettingsDrawer({
           </section>
         </div>
       </section>
+      <PetImageCrop
+        source={avatarCrop?.source ?? null}
+        outputSize={256}
+        title="裁剪头像"
+        description="拖动调整位置，滑块缩放；保存为 256×256 正方形头像。"
+        onCancel={() => setAvatarCrop(null)}
+        onApply={(dataUrl) => {
+          if (avatarCrop) onAvatarChange(avatarCrop.who, dataUrl);
+          setAvatarCrop(null);
+        }}
+      />
       <PetImageCrop
         source={petCropSource}
         onCancel={() => setPetCropSource(null)}
