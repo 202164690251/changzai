@@ -100,6 +100,9 @@ export function ChatShell(): ReactElement {
     moodNote: emotion.moodNote,
     onNotice: show,
   });
+  const sendTextRef = useRef(sendText);
+  sendTextRef.current = sendText;
+
   const voiceSettings = useMemo(
     () => ({ ...DEFAULT_VOICE_SETTINGS, ...(activeConversation?.settings?.voice ?? {}) }),
     [activeConversation?.settings?.voice],
@@ -131,15 +134,17 @@ export function ChatShell(): ReactElement {
         "pet.state",
         JSON.stringify({
           name: her.name,
-          avatar: her.avatar,
+          avatar: activeConversation?.petImage ?? her.avatar,
           text,
           ts: last?.ts ?? 0,
+          typing,
+          lastFrom: last?.from ?? "",
         }),
       );
     } catch {
       /* 头像过大或存储不可用时跳过 */
     }
-  }, [her.avatar, her.name, messages]);
+  }, [activeConversation?.petImage, her.avatar, her.name, messages, typing]);
 
   const handleTogglePet = useCallback(async (): Promise<void> => {
     if (!isTauri()) {
@@ -160,6 +165,14 @@ export function ChatShell(): ReactElement {
       show(error instanceof Error ? error.message : "桌宠窗口没有打开");
     }
   }, [show]);
+
+  const handlePetImageChange = useCallback(
+    (dataUrl: string | null) => {
+      if (!activeConversation) return;
+      conversations.update(activeConversation.id, { petImage: dataUrl });
+    },
+    [activeConversation, conversations],
+  );
 
   const [railTab, setRailTab] = useState<RailTab>("chat");
   const [search, setSearch] = useState("");
@@ -208,6 +221,20 @@ export function ChatShell(): ReactElement {
       unlisten?.();
     };
   }, [markRead]);
+
+  useEffect(() => {
+    if (!isTauri()) return;
+    let unlisten: (() => void) | undefined;
+    void listen<string>("pet://quick-send", (event) => {
+      const text = typeof event.payload === "string" ? event.payload.trim() : "";
+      if (text) sendTextRef.current(text);
+    }).then((stop) => {
+      unlisten = stop;
+    });
+    return () => {
+      unlisten?.();
+    };
+  }, []);
 
   useEffect(() => {
     if (!settingsOpen || !isTauri()) return;
@@ -1027,6 +1054,8 @@ export function ChatShell(): ReactElement {
           onTogglePet={() => {
             void handleTogglePet();
           }}
+          petImage={activeConversation?.petImage ?? null}
+          onPetImageChange={handlePetImageChange}
           analyticsCounts={analytics.counts}
           analyticsTotal={analytics.total}
           onClearAnalytics={analytics.clear}

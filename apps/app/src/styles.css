@@ -2165,3 +2165,25 @@ textarea:focus-visible {
 .voice-transcript-inline.me {
   text-align: right;
 }
+/* V2.3 桌宠图片 */
+.pet-image-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.pet-image-preview {
+  width: 56px;
+  height: 56px;
+  border-radius: 10px;
+  object-fit: cover;
+  border: 1px solid var(--line);
+}
+.pet-image-placeholder {
+  padding: 6px 9px;
+  border-radius: 7px;
+  background: var(--panel-bg);
+  color: var(--text-2);
+  font-size: 11px;
+}

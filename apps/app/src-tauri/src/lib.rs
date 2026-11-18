@@ -110,6 +110,9 @@ pub fn run() {
             pet::pet_open_main,
             pet::pet_start_drag,
             pet::pet_save_position,
+            pet::pet_send_text,
+            pet::pet_set_mini,
+            pet::pet_get_mini,
             safety::pin_enabled
         ])
         .setup(|app| {

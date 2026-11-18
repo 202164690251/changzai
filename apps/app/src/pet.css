@@ -136,3 +136,137 @@ body {
   background: #eef7f2;
   color: #2f8f5b;
 }
+
+/* V2.3 快捷聊天 / 状态 / Mini */
+.pet-status {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+  color: #718096;
+  font-size: 10px;
+}
+.pet-status i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #67c78d;
+}
+.pet-status.is-thinking i {
+  background: #f2b84b;
+  animation: pet-thinking 0.8s ease-in-out infinite;
+}
+@keyframes pet-thinking {
+  0%, 100% { opacity: 0.35; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.2); }
+}
+
+.pet-chat {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  margin-top: 6px;
+}
+.pet-chat input {
+  min-width: 0;
+  flex: 1;
+  height: 26px;
+  padding: 0 7px;
+  border: 1px solid #d8e4dc;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #2f3542;
+  font-size: 11px;
+  outline: none;
+}
+.pet-chat input:focus {
+  border-color: #77c99a;
+}
+.pet-icon-btn,
+.pet-send-btn {
+  height: 26px;
+  padding: 0 7px;
+  border: 0;
+  border-radius: 7px;
+  background: #eef7f2;
+  color: #3d7a58;
+  font-size: 11px;
+  cursor: pointer;
+}
+.pet-icon-btn {
+  width: 28px;
+  padding: 0;
+}
+.pet-icon-btn.is-recording {
+  background: #ffe8e8;
+  color: #d64545;
+}
+.pet-send-btn {
+  background: #4caf7a;
+  color: #fff;
+}
+.pet-quick {
+  display: flex;
+  gap: 3px;
+  width: 100%;
+  margin-top: 5px;
+  overflow: hidden;
+}
+.pet-quick button {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 4px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(238, 247, 242, 0.95);
+  color: #4a7a60;
+  font-size: 9px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.pet-quick button:hover {
+  background: #d9f0e4;
+}
+
+.pet-stage.is-patting {
+  animation: pet-pat 0.42s ease;
+}
+@keyframes pet-pat {
+  0% { transform: translateY(0) scale(1); }
+  35% { transform: translateY(-7px) scale(1.04); }
+  70% { transform: translateY(2px) scale(0.98); }
+  100% { transform: translateY(0) scale(1); }
+}
+
+body.is-mini #pet-root {
+  padding: 4px;
+}
+body.is-mini .pet-stage {
+  width: 82px;
+  height: 82px;
+}
+body.is-mini .pet-image {
+  border-radius: 12px;
+}
+body.is-mini .pet-fallback {
+  width: 72px;
+  height: 72px;
+  font-size: 28px;
+}
+body.is-mini .pet-name {
+  font-size: 9px;
+  padding: 1px 5px;
+}
+body.is-mini .pet-chat,
+body.is-mini .pet-quick {
+  display: none;
+}
+body.is-mini .pet-bubble {
+  top: 2px;
+  max-width: 160px;
+  font-size: 10px;
+  padding: 6px 8px;
+}
