@@ -130,7 +130,7 @@ export interface ChatApi {
   typing: boolean;
   unread: number;
   sendText: (text: string) => void;
-  sendVoice: (dataUrl: string, durationSec: number, transcript: string) => void;
+  sendVoice: (dataUrl: string, durationSec: number, transcript: string) => boolean;
   appendHerVoice: (dataUrl: string, durationSec: number, transcript: string) => void;
   replaceHerVoice: (id: string, dataUrl: string, durationSec: number, transcript: string) => void;
   updateVoiceText: (id: string, transcript: string) => void;
@@ -468,10 +468,8 @@ export function useChat(options: ChatOptions): ChatApi {
   );
 
   const sendVoice = useCallback(
-    (dataUrl: string, durationSec: number, transcript: string) => {
-      if (typing) return;
+    (dataUrl: string, durationSec: number, transcript: string): boolean => {
       const value = transcript.trim();
-      if (value.length === 0) return;
       const history = messages;
       const voice: ChatMsg = {
         id: nextId(),
@@ -479,15 +477,19 @@ export function useChat(options: ChatOptions): ChatApi {
         kind: "voice",
         dataUrl,
         durationSec: Math.max(1, durationSec),
-        text: value,
+        text: value || undefined,
         ts: Date.now(),
       };
       setMessages((previous) => [...previous, voice]);
       persistMessage(voice);
       setUnread(0);
-      respondToUser(value, history);
+      if (value.length > 0) {
+        respondToUser(value, history);
+        return true;
+      }
+      return false;
     },
-    [messages, nextId, persistMessage, respondToUser, typing],
+    [messages, nextId, persistMessage, respondToUser],
   );
 
   const appendHerVoice = useCallback(

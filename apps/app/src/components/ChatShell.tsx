@@ -58,6 +58,15 @@ function fallbackRelationship(userName: string): RelationshipProfile {
   };
 }
 
+function unclearVoiceLine(persona: PersonaProfile | null): string {
+  const summary = persona?.summary ?? "";
+  if (/嘴|毒|嫌弃|反话/.test(summary)) return "没听清，再说一遍？";
+  if (/安静|话少|沉默/.test(summary)) return "嗯……刚刚没听清，再说一次？";
+  if (/活泼|感叹|话多|追问/.test(summary)) return "啊？我这边没听清，再说一遍嘛！";
+  if (/温柔|慢慢|克制/.test(summary)) return "刚刚没听清，能再说一次吗？";
+  return "能再说一次嘛，我这边听不太清。";
+}
+
 export function ChatShell(): ReactElement {
   const db = useDatabase();
   const llm = useLlmConfig();
@@ -111,7 +120,6 @@ export function ChatShell(): ReactElement {
   const [safetyBusy, setSafetyBusy] = useState(false);
   const [safetyMessage, setSafetyMessage] = useState<string | null>(null);
   const [messageMenu, setMessageMenu] = useState<{ message: ChatMsg; x: number; y: number } | null>(null);
-  const [voiceTranscript, setVoiceTranscript] = useState<string | null>(null);
   const [reminder, setReminder] = useState(false);
   const [moodOpen, setMoodOpen] = useState(false);
   const [personaStartOpen, setPersonaStartOpen] = useState(false);
@@ -580,20 +588,22 @@ export function ChatShell(): ReactElement {
   const handleVoice = useCallback(
     async (voice: RecordedVoice): Promise<void> => {
       setVoiceBusy(true);
+      let transcript = "";
       try {
         const result = await api.sttTranscribe(voice.wavBase64);
-        if (!result.text.trim()) {
-          show("没听清，再说一句试试");
-          return;
-        }
-        sendVoice(voice.audioDataUrl, voice.durationSec, result.text);
-      } catch (error) {
-        show(error instanceof Error ? `语音识别失败：${error.message}` : "语音识别失败");
-      } finally {
-        setVoiceBusy(false);
+        const text = result.text.trim();
+        if (text && !text.includes("锟斤拷") && !text.includes("�")) transcript = text;
+      } catch {
+        /* 识别失败也照样把语音发出去，再让 ta 用自己的人设反问 */
       }
+      const recognized = sendVoice(voice.audioDataUrl, voice.durationSec, transcript);
+      if (!recognized) {
+        appendProactive(unclearVoiceLine(persona.profile));
+        show("这条语音没听清，已让 ta 再问一次");
+      }
+      setVoiceBusy(false);
     },
-    [sendVoice, show],
+    [appendProactive, persona.profile, sendVoice, show],
   );
 
   const handleVoiceTranscript = useCallback(
@@ -602,7 +612,7 @@ export function ChatShell(): ReactElement {
       const existing = message.text?.trim() ?? "";
       const garbled = existing.length === 0 || existing.includes("�") || existing.includes("锟斤拷");
       if (!garbled) {
-        setVoiceTranscript(existing);
+        show("语音文字已显示在气泡下方");
         return;
       }
       setVoiceBusy(true);
@@ -616,7 +626,7 @@ export function ChatShell(): ReactElement {
           return;
         }
         updateVoiceText(message.id, text);
-        setVoiceTranscript(text);
+        show("已重新转写，文字显示在气泡下方");
       } catch (error) {
         show(error instanceof Error ? `语音转写失败：${error.message}` : "语音转写失败");
       } finally {
@@ -867,6 +877,7 @@ export function ChatShell(): ReactElement {
             void handleVoice(voice);
           }}
           voiceBusy={voiceBusy}
+          onRecordingStart={() => tts.stop()}
           onNotice={show}
           insert={insertDraft}
         />
@@ -1144,25 +1155,6 @@ export function ChatShell(): ReactElement {
             >
               删除聊天（不可恢复）
             </button>
-          </div>
-        </div>
-      )}
-
-      {voiceTranscript !== null && (
-        <div className="message-menu-backdrop" onClick={() => setVoiceTranscript(null)}>
-          <div className="voice-transcript-modal" onClick={(event) => event.stopPropagation()}>
-            <div className="voice-transcript-head">
-              <b>语音转文字</b>
-              <button type="button" className="icon-btn" aria-label="关闭" onClick={() => setVoiceTranscript(null)}>
-                ×
-              </button>
-            </div>
-            <p>{voiceTranscript}</p>
-            <div className="modal-actions">
-              <button type="button" className="btn" onClick={() => setVoiceTranscript(null)}>
-                关闭
-              </button>
-            </div>
           </div>
         </div>
       )}
