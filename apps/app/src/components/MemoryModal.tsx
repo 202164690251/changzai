@@ -1,7 +1,7 @@
 // Step 6 · 翻一翻：从人格卡的参考对话里抽几段，给一个「回到过去」的入口
 import { useMemo } from "react";
 import type { ReactElement } from "react";
-import type { PersonaSample } from "@changzai/core";
+import type { PersonaSample } from "@veyrimi/core";
 
 export interface MemoryModalProps {
   open: boolean;

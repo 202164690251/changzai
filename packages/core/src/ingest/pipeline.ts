@@ -2,7 +2,7 @@
 // 原始文件 → 适配器嗅探/解析 → 归一化 → 去重 → 行为信号 → holdout 切分 → 体检报告
 // 纯函数：不读文件、不联网；文件内容由 UI / Rust 层读取后传进来。
 
-import type { HealthReport, NormalizedMessage, RawMessage } from "@changzai/shared";
+import type { HealthReport, NormalizedMessage, RawMessage } from "@veyrimi/shared";
 import { AdapterRegistry } from "./adapters/base.ts";
 import type { IngestAdapter } from "./adapters/base.ts";
 import { PlaintextPasteAdapter } from "./adapters/plaintext.ts";

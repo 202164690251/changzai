@@ -8,7 +8,7 @@ import {
   type CustomPersonaForm,
   type PersonaProfile,
   type PersonaSourceMessage,
-} from "@changzai/core";
+} from "@veyrimi/core";
 import { api, isTauri, type ImportMessageRow } from "../lib/tauri.ts";
 
 export interface PersonaApi {

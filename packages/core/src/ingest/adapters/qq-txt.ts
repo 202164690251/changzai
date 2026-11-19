@@ -4,7 +4,7 @@
 //   在干嘛
 //   [2023-05-20 14:03:22] 小林
 //   2023-05-20 14:03:22 小林: 在干嘛
-import type { RawMessage } from "@changzai/shared";
+import type { RawMessage } from "@veyrimi/shared";
 import type { AdapterSource, IngestAdapter } from "./base.ts";
 import { parseMultilineText, timestampLineRatio } from "./common.ts";
 

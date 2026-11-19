@@ -1,6 +1,6 @@
 // Step 2：聊天记录导入（选文件 → core 解析/体检 → 写 SQLCipher）
 import { useCallback, useState } from "react";
-import { importSources, type ImportResult } from "@changzai/core";
+import { importSources, type ImportResult } from "@veyrimi/core";
 import { api, isTauri, type ImportMessageRow } from "../lib/tauri.ts";
 
 export type ImportStep = "idle" | "picking" | "parsing" | "done" | "error";

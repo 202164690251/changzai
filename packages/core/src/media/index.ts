@@ -1,8 +1,8 @@
 // 常在 · 媒体工具（纯函数，无 DOM / Node API）
 // 与 Rust 侧 apps/app/src-tauri/src/media.rs 的规则保持一致。
 
-import { MEDIA } from "@changzai/shared";
-import type { MediaKind } from "@changzai/shared";
+import { MEDIA } from "@veyrimi/shared";
+import type { MediaKind } from "@veyrimi/shared";
 
 const IMAGE_EXT_SET = new Set<string>(MEDIA.imageExts);
 const VOICE_EXT_SET = new Set<string>(MEDIA.voiceExts);

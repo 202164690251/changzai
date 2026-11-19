@@ -4,7 +4,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import type { NormalizedMessage } from "@changzai/shared";
+import type { NormalizedMessage } from "@veyrimi/shared";
 import {
   normalizeMessage,
   validateMessage,

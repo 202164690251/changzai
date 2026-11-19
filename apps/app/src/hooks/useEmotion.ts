@@ -5,7 +5,7 @@ import {
   isMoodOverrideActive,
   type EmotionState,
   type MoodOverride,
-} from "@changzai/core";
+} from "@veyrimi/core";
 import { api, isTauri } from "../lib/tauri.ts";
 
 const SETTING_KEY = "emotion.state";

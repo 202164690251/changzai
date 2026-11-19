@@ -14,7 +14,7 @@ import {
   type ProactiveDesire,
   type ProactiveState,
   type RelationshipProfile,
-} from "@changzai/core";
+} from "@veyrimi/core";
 import { isPermissionGranted, requestPermission, sendNotification } from "@tauri-apps/plugin-notification";
 import { api, isTauri, type LlmConfig } from "../lib/tauri.ts";
 

@@ -8,7 +8,7 @@ import {
   buildPresetPersona,
   type CustomPersonaForm,
   type PersonaPreset,
-} from "@changzai/core";
+} from "@veyrimi/core";
 
 export interface PersonaStartProps {
   open: boolean;

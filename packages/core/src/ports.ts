@@ -2,7 +2,7 @@
 // Step 1 只定义契约；Step 2 起由 apps/app 的 Rust 宿主 / UI 层实现并注入。
 // 注意：这里刻意不引用 DOM 的 AbortSignal 类型，保持 core 平台无关。
 
-import type { NormalizedMessage, HealthReport, Progress } from "@changzai/shared";
+import type { NormalizedMessage, HealthReport, Progress } from "@veyrimi/shared";
 
 /** 与 DOM/Node 的 AbortSignal 结构兼容的最小接口 */
 export interface AbortSignalLike {

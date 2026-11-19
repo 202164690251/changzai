@@ -1,6 +1,6 @@
 // 风格校准：默认关闭；只有用户主动评价时才记录，并进入下一轮 prompt
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { styleCalibrationText, type StyleFeedback } from "@changzai/core";
+import { styleCalibrationText, type StyleFeedback } from "@veyrimi/core";
 import { api, isTauri } from "../lib/tauri.ts";
 
 const ENABLED_KEY = "style.review.enabled";

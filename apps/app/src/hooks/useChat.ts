@@ -23,7 +23,7 @@ import {
   type MemoryCandidate,
   type PersonaProfile,
   type RelationshipProfile,
-} from "@changzai/core";
+} from "@veyrimi/core";
 import { DEMO_VOICE_SECONDS, demoImageDataUrl, demoVoiceDataUrl } from "../lib/demoMedia.ts";
 import { formatTimeDivider } from "../lib/time.ts";
 import { api, isTauri, type ImportedMediaFile, type LlmConfig } from "../lib/tauri.ts";

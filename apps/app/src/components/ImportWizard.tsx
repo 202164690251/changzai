@@ -1,5 +1,5 @@
 // Step 2：聊天记录导入向导（选文件 → 解析 → 体检报告 → 完成）
-import { adapterCatalog } from "@changzai/core";
+import { adapterCatalog } from "@veyrimi/core";
 import type { ReactElement } from "react";
 import type { ImportState } from "../hooks/useImport.ts";
 import type { DbStats } from "../lib/tauri.ts";

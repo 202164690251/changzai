@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { ReactElement } from "react";
-import { STYLE_TAGS } from "@changzai/core";
+import { STYLE_TAGS } from "@veyrimi/core";
 
 export interface StyleReviewModalProps {
   text: string;

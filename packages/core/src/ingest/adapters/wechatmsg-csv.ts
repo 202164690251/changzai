@@ -1,6 +1,6 @@
 // 常在 · WeChatMsg 导出的 csv 适配器
 // 兼容中英文表头：时间/发送人/内容/类型、CreateTime/IsSender/StrContent/Type 等。
-import type { RawMessage } from "@changzai/shared";
+import type { RawMessage } from "@veyrimi/shared";
 import type { AdapterSource, IngestAdapter } from "./base.ts";
 import { mapWechatType, senderFromFlag, senderFromName } from "./common.ts";
 

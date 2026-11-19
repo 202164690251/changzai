@@ -1,6 +1,6 @@
 // Step 2：数据库初始化与状态（SQLCipher + DDL 由 core 提供唯一事实源）
 import { useCallback, useEffect, useState } from "react";
-import { DDL_V2 } from "@changzai/core";
+import { DDL_V2 } from "@veyrimi/core";
 import { api, isTauri, type DbStats } from "../lib/tauri.ts";
 
 export interface DatabaseApi {

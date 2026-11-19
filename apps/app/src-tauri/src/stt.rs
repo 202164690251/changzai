@@ -42,7 +42,7 @@ fn windows_transcribe(bytes: &[u8]) -> Result<SttResult, String> {
     use std::process::Command;
 
     let id = format!("{}-{}", std::process::id(), rand::random::<u64>());
-    let path = std::env::temp_dir().join(format!("changzai-stt-{id}.wav"));
+    let path = std::env::temp_dir().join(format!("veyrimi-stt-{id}.wav"));
     std::fs::write(&path, bytes).map_err(|error| format!("写入录音失败: {error}"))?;
 
     let script = r#"Add-Type -AssemblyName System.Speech
@@ -131,7 +131,7 @@ mod tests {
         use std::os::windows::process::CommandExt;
         use std::process::Command;
 
-        let wav = std::env::temp_dir().join(format!("changzai-stt-roundtrip-{}.wav", std::process::id()));
+        let wav = std::env::temp_dir().join(format!("veyrimi-stt-roundtrip-{}.wav", std::process::id()));
         let script = r#"Add-Type -AssemblyName System.Speech
 $s = New-Object System.Speech.Synthesis.SpeechSynthesizer
 try {

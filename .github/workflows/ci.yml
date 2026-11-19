@@ -28,7 +28,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Typecheck (app)
-        run: pnpm --filter @changzai/app exec tsc --noEmit
+        run: pnpm --filter @veyrimi/app exec tsc --noEmit
       - name: Typecheck (core + shared)
         run: pnpm exec tsc -p packages/core/tsconfig.json --noEmit
       - name: Core unit tests (Node 24 native TS)
@@ -42,7 +42,7 @@ jobs:
       - name: Eval harness
         run: node scripts/eval.ts
       - name: Web build
-        run: pnpm --filter @changzai/app build
+        run: pnpm --filter @veyrimi/app build
 
   rust:
     name: rust

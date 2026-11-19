@@ -5,7 +5,7 @@
 //   2023年5月20日 14:03 小林：嗯
 // 连续的非时间行会追加到上一条消息内容里。
 
-import type { RawMessage } from "@changzai/shared";
+import type { RawMessage } from "@veyrimi/shared";
 import type { AdapterSource, IngestAdapter } from "./base.ts";
 
 const LINE_RE =

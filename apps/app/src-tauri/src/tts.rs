@@ -125,8 +125,8 @@ fn windows_speak(request: &TtsRequest) -> Result<TtsResult, String> {
 
     let id = format!("{}-{}", std::process::id(), rand::random::<u64>());
     let dir = std::env::temp_dir();
-    let text_path = dir.join(format!("changzai-tts-{id}.txt"));
-    let out_path = dir.join(format!("changzai-tts-{id}.wav"));
+    let text_path = dir.join(format!("veyrimi-tts-{id}.txt"));
+    let out_path = dir.join(format!("veyrimi-tts-{id}.wav"));
     std::fs::write(&text_path, request.text.as_bytes())
         .map_err(|error| format!("写入朗读文本失败: {error}"))?;
 

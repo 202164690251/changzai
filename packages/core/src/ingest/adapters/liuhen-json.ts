@@ -1,6 +1,6 @@
 // 常在 · 留痕 / 其它工具导出的 JSON 适配器
 // 兼容：顶层数组、{messages:[...]}、{data:[...]}、{chatRecords:[...]}
-import type { RawMessage } from "@changzai/shared";
+import type { RawMessage } from "@veyrimi/shared";
 import type { AdapterSource, IngestAdapter } from "./base.ts";
 import { mapWechatType, senderFromFlag, senderFromName } from "./common.ts";
 

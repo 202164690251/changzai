@@ -5,8 +5,8 @@ import type {
   FidelityLevel,
   HealthReport,
   NormalizedMessage,
-} from "@changzai/shared";
-import { FIDELITY_THRESHOLDS, INGEST } from "@changzai/shared";
+} from "@veyrimi/shared";
+import { FIDELITY_THRESHOLDS, INGEST } from "@veyrimi/shared";
 import { sortMessages } from "./schema.ts";
 
 export interface HealthReportOptions {
