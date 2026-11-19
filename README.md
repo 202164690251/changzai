@@ -1,10 +1,10 @@
-# 常在（Still Here）· Windows PC 单端
+# veyrimi · 如晤（Still Here）· Windows PC 单端
 
 > 把一段关系，做成一个还愿意陪你说说话的人。
 
 [![CI](https://github.com/202164690251/changzai/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/202164690251/changzai/actions/workflows/ci.yml)
 
-本仓库是「常在」的 **PC 单端（Windows 优先）** 实现：本地优先、单用户、用户自带模型 API、无服务端。
+本仓库是「如晤」的 **PC 单端（Windows 优先）** 实现：本地优先、单用户、用户自带模型 API、无服务端。
 当前进度：**Step 0（决策与准备）+ Step 1（技术底座 + 五项 spike）+ UI 重做（微信桌面版风格）**。
 
 ## 快速入口

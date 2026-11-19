@@ -1,7 +1,7 @@
 [package]
 name = "changzai"
 version = "0.1.0"
-description = "常在 Still Here · Windows PC 单端"
+description = "veyrimi 如晤 · Windows PC 单端"
 authors = ["changzai"]
 edition = "2021"
 rust-version = "1.77"
