@@ -1,3 +1,7 @@
+:root {
+  --pet-size: 240px;
+}
+
 html,
 body {
   margin: 0;
@@ -31,13 +35,14 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: flex-end;
-  padding: 10px 12px 14px;
+  padding: 8px 12px 12px;
 }
 
 .pet-stage {
   position: relative;
-  width: 200px;
-  height: 200px;
+  width: var(--pet-size);
+  height: var(--pet-size);
+  flex: 0 0 auto;
   display: grid;
   place-items: center;
   cursor: grab;
@@ -70,6 +75,14 @@ body {
   font-weight: 600;
   box-shadow: 0 8px 22px rgba(0, 0, 0, 0.14);
   pointer-events: none;
+}
+
+.pet-chat-panel {
+  width: 280px;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .pet-name {
@@ -238,6 +251,42 @@ body {
 }
 .pet-quick button:hover {
   background: #d9f0e4;
+}
+
+.pet-resize {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  z-index: 8;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.62);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.16);
+  cursor: nwse-resize;
+  opacity: 0.55;
+}
+.pet-resize::before,
+.pet-resize::after {
+  content: "";
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  background: #5b8f72;
+  transform: rotate(-45deg);
+  transform-origin: right bottom;
+}
+.pet-resize::before {
+  width: 9px;
+  height: 1px;
+}
+.pet-resize::after {
+  width: 1px;
+  height: 9px;
+}
+.pet-resize:hover {
+  opacity: 1;
+  background: #eef7f2;
 }
 
 .pet-stage.is-patting {
