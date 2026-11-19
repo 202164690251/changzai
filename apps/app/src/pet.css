@@ -253,42 +253,6 @@ body {
   background: #d9f0e4;
 }
 
-.pet-resize {
-  position: absolute;
-  right: 2px;
-  bottom: 2px;
-  z-index: 8;
-  width: 18px;
-  height: 18px;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.62);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.16);
-  cursor: nwse-resize;
-  opacity: 0.55;
-}
-.pet-resize::before,
-.pet-resize::after {
-  content: "";
-  position: absolute;
-  right: 4px;
-  bottom: 4px;
-  background: #5b8f72;
-  transform: rotate(-45deg);
-  transform-origin: right bottom;
-}
-.pet-resize::before {
-  width: 9px;
-  height: 1px;
-}
-.pet-resize::after {
-  width: 1px;
-  height: 9px;
-}
-.pet-resize:hover {
-  opacity: 1;
-  background: #eef7f2;
-}
-
 .pet-stage.is-action-feedback {
   animation: pet-action-pop 0.48s ease;
 }

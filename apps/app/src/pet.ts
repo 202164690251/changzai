@@ -44,11 +44,8 @@ let bubbleTimer: number | null = null;
 let menuOpen = false;
 let chatOpen = false;
 let stageSize = 280;
-let resizing = false;
-let resizeStartX = 0;
-let resizeStartY = 0;
-let resizeStartSize = 280;
 let layoutTimer = 0;
+let sizeSaveTimer = 0;
 let live2dHandle: {
   destroy: () => void;
   resize: () => void;
@@ -411,7 +408,6 @@ quick.addEventListener("click", (event) => {
 
 stage.addEventListener("mousedown", (event) => {
   if (event.button !== 0) return;
-  if ((event.target as HTMLElement).closest(".pet-resize")) return;
   hideMenu();
   pointerDown = true;
   dragStarted = false;
@@ -431,7 +427,7 @@ stage.addEventListener("mousemove", (event) => {
 });
 
 window.addEventListener("mousemove", (event) => {
-  if (resizing || !pointerDown || dragStarted) return;
+  if (!pointerDown || dragStarted) return;
   if (Math.hypot(event.screenX - downX, event.screenY - downY) < 5) return;
   dragStarted = true;
   suppressClick = true;
@@ -440,7 +436,7 @@ window.addEventListener("mousemove", (event) => {
 });
 
 window.addEventListener("mouseup", () => {
-  if (menuOpen || resizing) return;
+  if (menuOpen) return;
   pointerDown = false;
   if (behaviorState === "dragging") {
     setBehavior(canSleep() ? "sleeping" : "idle");
@@ -691,33 +687,23 @@ void invoke<{ size: number; chatOpen: boolean }>("pet_get_layout")
   })
   .catch(() => applyStageSize(stageSize, false));
 
-// 右下角拖拽调整桌宠大小；下方名称/状态/聊天宽度保持固定
-const resizeHandle = document.getElementById("pet-resize") as HTMLElement;
-resizeHandle.addEventListener("pointerdown", (event) => {
-  if (event.button !== 0) return;
-  event.preventDefault();
-  event.stopPropagation();
-  resizing = true;
-  suppressClick = true;
-  resizeStartX = event.screenX;
-  resizeStartY = event.screenY;
-  resizeStartSize = stageSize;
-  resizeHandle.setPointerCapture(event.pointerId);
-  document.body.classList.add("is-resizing");
-});
+// 鼠标在桌宠上滚动滚轮缩放；下方名称/状态/聊天宽度保持固定
+stage.addEventListener(
+  "wheel",
+  (event) => {
+    event.preventDefault();
+    const step = Math.max(-48, Math.min(48, -event.deltaY * 0.3));
+    if (step === 0) return;
+    applyStageSize(stageSize + step, false);
+    scheduleLayout();
+    if (sizeSaveTimer !== 0) window.clearTimeout(sizeSaveTimer);
+    sizeSaveTimer = window.setTimeout(() => {
+      sizeSaveTimer = 0;
+      syncLayout();
+    }, 260);
+  },
+  { passive: false },
+);
 
-window.addEventListener("pointermove", (event) => {
-  if (!resizing) return;
-  const delta = (event.screenX - resizeStartX + event.screenY - resizeStartY) / 2;
-  applyStageSize(resizeStartSize + delta, false);
-  scheduleLayout();
-});
-
-window.addEventListener("pointerup", () => {
-  if (!resizing) return;
-  resizing = false;
-  document.body.classList.remove("is-resizing");
-  syncLayout();
-});
-
+// 兼容旧版保存的尺寸；聊天区不参与缩放
 applyState();
