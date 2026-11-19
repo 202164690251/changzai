@@ -1,153 +1,249 @@
-# veyrimi · 如晤（Still Here）· Windows PC 单端
+# veyrimi · 如晤
 
-> 把一段关系，做成一个还愿意陪你说说话的人。
+> 见字如晤，见你亦是。
 
-[![CI](https://github.com/202164690251/changzai/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/202164690251/changzai/actions/workflows/ci.yml)
+**把同一个 ta，带进文字、声音、桌面与视频里的本地 AI 陪伴空间。**
 
-本仓库是「如晤」的 **PC 单端（Windows 优先）** 实现：本地优先、单用户、用户自带模型 API、无服务端。
-当前进度：**Step 0（决策与准备）+ Step 1（技术底座 + 五项 spike）+ UI 重做（微信桌面版风格）**。
+[![CI](https://github.com/202164690251/veyrimi/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/202164690251/veyrimi/actions/workflows/ci.yml)
 
-## 快速入口
+- 平台：Windows 10 / 11（x64）
+- 形态：Tauri 2 桌面应用，本地优先，无服务器、无遥测
+- 当前版本：0.1.0 内测
+- 数据：SQLCipher 加密，默认只存在本机
+- 模型：用户自带 OpenAI 兼容接口；应用不内置聊天模型
 
-| 内容 | 位置 |
+---
+
+## 她是什么
+
+如晤不是“另一个聊天软件”。
+
+它做的是：**把你熟悉的那个人，用聊天记录、人格卡、声音和 Live2D 重新组织出来，让她出现在不同形态里。**
+
+- 在聊天窗口里，她像微信里的一个人；
+- 在桌面上，她是一个会动、会回应、会自己待机的桌宠；
+- 在语音里，她可以用 TTS 说话；
+- 在视频窗口里，她以 Live2D 形象出现；
+- 所有这些形态，共用同一份人格、关系、情绪和记忆。
+
+> 这是一个 AI 模拟陪伴产品。所有回复由你配置的模型生成，不是真人，也不代表聊天记录中的对方本人。
+
+---
+
+## 当前功能
+
+### 1. 聊天与创建
+
+- 三栏微信桌面版风格界面，多会话列表；
+- 两种开始方式：
+  - 导入聊天记录，自动生成人格卡；
+  - 8 个性格模板 / 结构化自定义，不依赖聊天记录；
+- 6 种聊天记录适配器：
+  - WeChatMsg TXT / CSV；
+  - 留痕 JSON；
+  - QQ TXT；
+  - 直接粘贴；
+  - 网页导出 `data.js`；
+- 导入体检：消息数、时间跨度、夜间比例、缺失段、holdout；
+- 人格卡：句长、语气词、高频短语、事实、参考对话、边界；
+- 人格卡编辑与最多 10 版回滚；
+- 关系卡：关系类型、称呼、关于你的事实，可编辑、可重新总结；
+- 可变高度虚拟滚动、引用、重新编辑、撤回、删除、搜索；
+- 图片/语音气泡、图片灯箱、语音播放；
+- 夜间模式、90 分钟休息提醒、托盘常驻。
+
+### 2. 人格、情绪、记忆与主动消息
+
+- 四轴情绪：心情 / 精力 / 亲近 / 防备；
+- 8 类默认心情，可手动覆盖；
+- 情绪衰减、单轮硬限、四类 Arc；
+- Comfort Governor：危机、依恋上限、脆弱、正常；
+- 长期记忆 + SQLite FTS5 检索；
+- 四层记忆装配：人格卡、关系卡、近期对话、检索记忆；
+- 事实锁：20 条对抗样例；
+- 主动消息：克制 / 适中 / 黏人 / 自定义；
+- 预算、免打扰、活跃时段、最小空闲、检查间隔、概率阈值、连续未回上限；
+- 主动消息带最近上下文，并经过质量过滤。
+
+### 3. 语音
+
+- Windows SAPI / OpenAI TTS；
+- 语音气泡、自动朗读、回复语音概率；
+- 麦克风录音 → STT 转写 → 确认发送；
+- TTS 失败自动回退文字；
+- 危机/安全提示默认不转语音。
+
+### 4. Live2D 与桌宠
+
+- 独立透明桌宠窗口，置顶、拖动、位置记忆；
+- 图片桌宠：正方形裁剪、纯色背景去除、整体呼吸、点击弹跳；
+- Live2D：
+  - Cubism 4 `.model3.json` 文件夹 / zip 导入；
+  - 多模型选择；
+  - 动作组、表情、HitAreas；
+  - Idle / Tap / 随机动作 / 随机表情；
+  - 鼠标视线跟随；
+  - TTS 口型（`ParamMouthOpenY` / `JawOpen`）；
+  - VTube Studio `.vtube.json` 的 Hotkeys 自动转换成 Motions / Expressions；
+- 行为状态机：idle / thinking / talking / dragging / sleeping / happy / annoyed；
+- 深夜睡眠、摸头、戳一戳、喂食、连续戳生气；
+- 自动动效活跃度、动作反馈、恢复默认表情；
+- 滚轮缩放桌宠，下方聊天区固定；
+- 快捷聊天、快捷回复、语音输入、Mini 旧兼容；
+- V2.4 视频通话：
+  - 独立 Tauri 窗口；
+  - 当前聊天 Live2D / 图片回退；
+  - TTS 播报 + 音量包络口型；
+  - 接通 / 挂断 / 静音；
+  - 不调用摄像头、不录像；
+  - `VideoAvatarProvider` 接口预留 VRM / 云端数字人。
+
+### 5. 数据、安全与隐私
+
+- SQLCipher 整库加密；
+- 启动 PIN；
+- 加密 `.czbak` 备份：数据库 + 密钥 + 媒体；
+- 一键销毁：3 次随机覆盖后删除；
+- 本地统计、使用说明、AI 披露；
+- 无服务器、无遥测；
+- 只有你配置的模型 / TTS 服务商会收到对应请求内容。
+
+---
+
+## 技术栈
+
+| 层 | 技术 |
 |---|---|
-| 产品/工程文档 | [`docs/product/`](docs/product/)（总索引 [00-INDEX](docs/product/00-INDEX.md)） |
-| Step 0 决策与准备 | [`docs/step0-decisions.md`](docs/step0-decisions.md)、[导出指引](docs/step0-data-export-guide.md)、[holdout 协议](docs/step0-holdout-protocol.md)、[设计基线](docs/step0-design-baseline.md) |
-| Step 1 spike 报告 | [`docs/step1-spike-report.md`](docs/step1-spike-report.md) |
-| 协作规范 | [`CONTRIBUTING.md`](CONTRIBUTING.md)（分支/PR/CI/隐私红线） |
-| 构建产物 | `release/veyrimi.exe`、`release/veyrimi_0.1.0_x64-setup.exe`（未签名，内测用） |
-| 一键验收 | `scripts/verify.ps1`（类型检查 + core 单测 + Rust 探针 + spike 套件） |
+| 桌面 | Tauri 2（Rust + WebView2） |
+| 前端 | React 19 + TypeScript + Vite 7 |
+| 核心逻辑 | `@veyrimi/core` 纯 TS，无 DOM / Node API |
+| 数据 | SQLite + SQLCipher（rusqlite） |
+| 检索 | SQLite FTS5 |
+| Live2D | Cubism 4 Core + PixiJS 6 + pixi-live2d-display |
+| 语音 | Windows SAPI / OpenAI 兼容 TTS + STT |
+| 打包 | NSIS，内置 WebView2 Bootstrapper 与 OpenSSL 运行库 |
+
+### 架构纪律
+
+1. `packages/core` 不出现 `window` / `fs` / `fetch` / `localStorage`；
+2. 平台能力通过 `DbPort` / `HttpPort` / `ClockPort` / `NotifyPort` / `KeyPort` 注入；
+3. UI 不直接操作数据库，统一走 core / hooks；
+4. 数据格式带 `schema_version`，迁移可重放；
+5. 调度逻辑与平台投递分离。
+
+---
 
 ## 仓库结构
 
-```
-changzai/
-├── apps/app/                 # 唯一应用：React + Tauri 2（Windows 桌面）
-│   └── src-tauri/            # Rust 宿主：SQLCipher / 媒体导入 / 通知 / 托盘 / 探测
-├── packages/core/            # 纯 TS 核心（无 DOM / 无 Node API，可单测）
+```text
+veyrimi/
+├── apps/app/                 # React + Tauri 2 桌面应用
+│   └── src-tauri/            # Rust：SQLCipher / 媒体 / TTS / 托盘 / 桌宠 / 视频窗口
+├── packages/core/            # 纯 TS 核心：导入、人格、情绪、记忆、Prompt
 ├── packages/shared/          # 类型、常量、设计 token
-├── prompts/                  # Prompt 模板（随版本发布，不热更）
-├── spikes/                   # Step 1 能力验证脚本（可独立运行）
-├── scripts/                  # 环境 / 开发 / 构建 / 验收脚本
-├── docs/                     # 产品文档 + Step 0/1 产出 + 截图
-└── .github/                  # CI、PR 模板、CODEOWNERS
+├── prompts/                  # Prompt 模板
+├── scripts/                  # 环境 / 开发 / 构建 / 验收
+├── docs/                     # 产品、技术、路线、截图
+├── site/                     # 静态官网
+└── examples/                 # 合成聊天样本
 ```
 
-## 环境要求（Windows）
+---
 
-| 依赖 | 版本 | 说明 |
-|---|---|---|
-| Node.js | 24 LTS（≥20） | 用 Node 24 原生跑 TypeScript 单测 |
-| pnpm | 11.x | workspace 管理 |
-| Rust | stable MSVC | `rustup default stable-x86_64-pc-windows-msvc` |
-| Visual Studio 2022 | C++ 桌面开发 | 提供 MSVC / nmake / Windows SDK |
-| OpenSSL | 3.x 预编译（Win64） | SQLCipher 默认链接预编译 OpenSSL；`env.ps1` 自动探测 `D:\tools\openssl\x64` 或 `C:\Program Files\OpenSSL-Win64`，也可自行设置 `OPENSSL_DIR` |
-| Strawberry Perl + NASM | 可选 | 仅 `sqlcipher-vendored` 自包含构建需要（见 `docs/step1-spike-report.md` §3） |
-| WebView2 Runtime | 已安装 | Win11 预装；Win10 由安装包内置 Bootstrapper |
+## 快速开始
 
-`scripts/env.ps1` 会自动探测 Node/Rust/MSVC/Perl/NASM；缺失 Perl/NASM 时给出警告。
+### 环境
+
+| 依赖 | 版本 |
+|---|---|
+| Node.js | 24 LTS（≥20） |
+| pnpm | 11.x |
+| Rust | stable MSVC |
+| Visual Studio 2022 | C++ 桌面开发 |
+| OpenSSL | 3.x Win64（构建 SQLCipher 需要） |
+| WebView2 Runtime | Windows 11 预装；Win10 由安装包 Bootstrapper 安装 |
+| Strawberry Perl + NASM | 可选，仅 `sqlcipher-vendored` 自包含构建需要 |
 
 ```powershell
-# 1) 引导当前终端（每个新终端执行一次）
+# 引导当前终端
 powershell -ExecutionPolicy Bypass -File scripts\env.ps1
 
-# 2) 安装前端依赖
+# 安装依赖
 pnpm install
 
-# 3) 全量验收（类型检查 + 19 项 core 单测 + Rust 探针 + spike）
+# 全量验收
 powershell -ExecutionPolicy Bypass -File scripts\verify.ps1
 
-# 4) 开发 / 打包桌面应用
-powershell -ExecutionPolicy Bypass -File scripts\dev.ps1     # Tauri dev（自动起 vite）
-powershell -ExecutionPolicy Bypass -File scripts\build.ps1   # Windows 安装包（NSIS）
+# 开发
+powershell -ExecutionPolicy Bypass -File scripts\dev.ps1
+
+# 构建安装包（输出在 Tauri target 目录）
+powershell -ExecutionPolicy Bypass -File scripts\build.ps1
 ```
 
-## 界面预览
+构建后把以下文件复制到 `release/`：
 
-主界面（仿微信 4.x 桌面版；无 AI 气泡角标，AI 披露在「设置 → 使用说明」）：
+```text
+veyrimi.exe
+veyrimi_0.1.0_x64-setup.exe
+libcrypto-3-x64.dll
+libssl-3-x64.dll
+```
 
-![聊天主界面](docs/assets/step3-shell.png)
+安装包已内置 OpenSSL DLL；portable 版则需要把两个 DLL 放在 `veyrimi.exe` 同目录。
 
-| 设置（双方昵称/头像、素材导入、使用说明） | 导入图片/语音后的气泡 |
-|---|---|
-| ![设置（模型/人格卡入口）](docs/assets/step3-settings.png) | ![素材](docs/assets/step1-media.png) |
+---
 
-> 开发调试页（技术自检）已从主界面移除：浏览器地址加 `#/dev` 或按 `Ctrl+Shift+D` 打开。
+## 发布与复现
 
-## 当前状态
+- `release/` 被 `.gitignore` 忽略，**安装包不进入 Git 仓库**；
+- GitHub 仓库保存的是源码、资源、图标和构建脚本，不保存构建产物；
+- 别人可以从源码复现，但需要 Node / pnpm / Rust / MSVC / OpenSSL 等完整构建环境；
+- CI 只做类型检查、core 单测、Rust 测试和前端构建，**不会自动上传安装包**；
+- 最省事的分享方式：把 `veyrimi_0.1.0_x64-setup.exe` 单独发给对方；
+- 应用未签名，Windows SmartScreen 会提示；需要点“更多信息 → 仍要运行”。
 
-| 项 | 状态 |
-|---|---|
-| Step 0 决策基线 | ✅ `docs/step0-decisions.md`（部分默认值待确认） |
-| Step 0 导出/媒体指引、holdout 协议、设计基线 | ✅ |
-| Step 1 monorepo + Tauri 2 桌面壳 | ✅ 已构建并启动验证（`docs/assets/step1-shell.png`） |
-| Step 1 SQLCipher 整库加密 | ✅ 加密/文件头/错误口令/重开 全部通过（Strawberry Perl 5.42.3 + NASM 2.16.03） |
-| Step 1 FTS5 中文检索 | ✅ trigram recall@5 100%（Python + Rust 双验证） |
-| Step 1 托盘 + Windows 通知 | ✅ 代码 + Toast 能力验证 |
-| Step 1 Rust 流式 HTTP | ✅ 本地 chunked echo 测试通过 |
-| Step 1 安装包 | ✅ `release/veyrimi_0.1.0_x64-setup.exe`（NSIS，未签名） |
-| UI：微信桌面版风格 | ✅ 三栏布局、双方头像、图片/语音气泡、设置抽屉 |
-| 双方昵称/头像自定义 | ✅ 设置页可改；已写入 SQLCipher `profile` 表（localStorage 双写兜底） |
-| 图片/语音素材导入 | ✅ 设置页导入 → 气泡展示；记录写入 `media` 表 |
-| Step 2 导入适配器（6 种） | ✅ wechatmsg_txt / csv / liuhen_json / qq_txt / plaintext_paste / **chatdata_js**（13 项单测） |
-| Step 2 导入向导 + 体检报告 | ✅ 设置 → 数据 → 导入聊天记录；解析/去重/burst/latency/holdout 后写入 SQLCipher |
-| Step 2 真实数据持久化 | ✅ `db_init` / `import_persist` / `db_stats` / `profile_*` / `media_persist`；Rust 4 项测试 |
-| Step 2 示例数据 | ✅ `examples/` 合成聊天文件，可直接导入测试（无隐私） |
-| AI 披露方式 | ✅ 不做每条气泡角标；改为「设置 → 使用说明」+ 首启说明（见 `docs/step0-decisions.md`） |
-| 默认称呼 | ✅ 系统默认 **ta**（不再叫「小林」）；旧默认自动迁移，用户可自行改 |
-| Step 3 人格卡 | ✅ 风格卡/事实/参考对话/边界，8 项单测；holdout 自动排除 |
-| Step 3 模型接入 | ✅ OpenAI 兼容配置；API Key 存 SQLCipher；Rust SSE 流式回复 |
-| Step 3 聊天 | ✅ 已接入真实模型（无配置/无记录时保留演示回复） |
-| Step 4 情绪引擎 | ✅ 四轴状态 + 衰减 + 单轮硬限 + 8 类刺激 + 四类 Arc |
-| Step 4 Comfort Governor | ✅ 危机/依恋上限/脆弱/正常；归因/上限/出口 |
-| Step 4 记忆 | ✅ FTS5 memory_rebuild/search + L0–L3 四层装配（<3000 字符） |
-| Step 4 事实锁 | ✅ 20 条对抗样例全部拦截 |
-| Step 4 本地统计 | ✅ 设置页可查看/清空；只存本机 |
-| Step 5 模型层 | ✅ 7 家预设 + 自定义 + 快速模型 + 测一下 + 429/5xx 重试 |
-| Step 5 AI 味过滤 | ✅ 客服腔/列表/破折号/长句/套话清理 |
-| Step 5 Decide/分段 | ✅ 回复概率、已读不回、拟人延迟、1–3 段到达 |
-| Step 5 撤回 | ✅ 菜单撤回 + 系统提示 + 限流 |
-| Step 5 主动消息 | ✅ 三档欲望（克制/适中/黏人）+ 自定义；预算/免打扰/活跃时段/空闲/间隔/阈值全可调 |
-| Step 6 四步引导 | ✅ 18+ → 导入 → 人格卡 → 模型配置 |
-| Step 6 安全/备份 | ✅ 启动 PIN；加密 .czbak（DB+key+媒体）；一键销毁（覆盖写）；危机资源 |
-| Step 6 聊天壳增强 | ✅ 可变高度虚拟滚动；复制/删除/引用/重新编辑/撤回；翻一翻；夜间模式；90min 提醒 |
-| Step 6 人格审阅 | ✅ 事实逐条移除/补充、保存、最多 10 版回滚 |
-| Step 7 关系/状态/校准 | ✅ 关系卡自动总结+可编辑；ta 状态面板；主动消息秒级/不限/可关免打扰；风格校准默认关闭 |
-| Step 7 上下文持久化 | ✅ 聊天记录落 SQLCipher（重启恢复）；话题短摘要 + 记忆检索 + 先接上一句 |
-| 多会话 | ✅ 左侧聊天列表；+ 新建；右键清空/删除；聊天与消息搜索 |
-| V2.0 创建方式 | ✅ 初始界面三选一；8 个性格模板；结构化自定义；预设/自定义不依赖聊天记录 |
-| Step 7 评测骨架 | ✅ 黄金集 20 条 + `pnpm eval`（20/20 mock）；合规草案、发布说明、官网模板 |
-| 技术自检面板 | ✅ 从主界面移除；`#/dev` 或 Ctrl+Shift+D 进入开发页 |
-| 多端（iOS/Android） | ⏳ 本期不做（架构已保留） |
+---
 
-## 协作（多人）
+## 当前未完成 / 后续版本
 
-仓库地址：<https://github.com/202164690251/changzai>
+- 真人盲测、模型回归、情绪收益问卷；
+- 代码签名、MSI、自动更新；
+- VRM 3D 形象；
+- 双向实时语音通话（当前视频是形象 + TTS 播报）；
+- 图片语义分割、自动分层、眨眼 / 口型；
+- 40+ / 104 动作内容库与动作编辑器；
+- 屏幕感知、任务伴随；
+- 云端同步 / 移动端（当前只做 Windows PC 单端）。
 
-- **main 已开启强制分支保护**：直接 push 会被拒绝；必须 PR + 1 人 review（含 Code Owner）+ CI `web`/`rust` 全绿，Squash merge 后才能进 main。协作者邀请为 **Write** 即可（他们只能推分支/开 PR，推不了 main）。详见 [CONTRIBUTING §8](CONTRIBUTING.md#8-main-保护与合并审核已开启)；
-- 每位成员一个功能分支：`feat/<scope>-<short>` / `fix/<scope>-<short>` / `docs/<short>`；
-- 详细流程、提交规范、邀请协作者、数据隐私红线：见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+详细路线见：
+
+- [`docs/step11-v2.3-mvp.md`](docs/step11-v2.3-mvp.md)
+- [`docs/step7-plan.md`](docs/step7-plan.md)
+- [`docs/`](docs/)
+
+---
+
+## 许可与素材
+
+- 代码与产品素材按项目自身授权；
+- Live2D Cubism Core 为 Live2D 专有运行时，遵守其许可；
+- 用户导入的 Live2D 模型、聊天记录、头像、声音，权利归原权利人；
+- 应用不内置第三方角色模型；
+- 分享安装包时，不要附带他人的聊天记录、模型或声音。
+
+---
+
+## 协作
+
+仓库：<https://github.com/202164690251/veyrimi>
+
+- `main` 开启分支保护：PR + review + CI 全绿后 squash merge；
+- 分支：`feat/<scope>-<short>` / `fix/<scope>-<short>` / `docs/<short>`；
+- 详细规范见 [`CONTRIBUTING.md`](CONTRIBUTING.md)。
 
 ```powershell
-git clone https://github.com/202164690251/changzai.git
-cd changzai
-git switch -c feat/your-task
-# 开发 → 提交 → push → 在 GitHub 开 PR
+git clone https://github.com/202164690251/veyrimi.git
+cd veyrimi
+pnpm install
 ```
-
-## 架构纪律（未来补移动端的前提）
-
-1. `packages/core` 禁止出现 `window` / `fs` / `fetch` / `localStorage`；
-2. 平台能力一律走注入接口（`DbPort` / `HttpPort` / `ClockPort` / `NotifyPort` / `KeyPort`）；
-3. UI 不直接操作 DB，统一走 core 的 `CoreAPI`（Step 2 起逐步接入）；
-4. 数据格式带 `schema_version`，迁移可重放；
-5. 调度（纯逻辑）与投递（平台实现）分离。
-
-## 接下来（Step 7 外部动作）
-
-1. 真人盲测（≥50%）、情绪收益问卷、负向放大率、3 家模型回归；
-2. 律师审阅隐私/协议/AI 披露；确认 AI 标识方案；
-3. 代码签名证书、MSI（需 WiX）、自动更新 endpoint + 密钥；
-4. DPI/多屏/输入法实机验收；GitHub Release + 官网上线。
-
-> Step 2–8 进度见 [docs/step2-progress.md](docs/step2-progress.md)、[docs/step3-progress.md](docs/step3-progress.md)、[docs/step4-progress.md](docs/step4-progress.md)、[docs/step5-progress.md](docs/step5-progress.md)、[docs/step6-progress.md](docs/step6-progress.md)、[docs/step7-plan.md](docs/step7-plan.md)、[docs/step8-v2.0-progress.md、[docs/step9-multi-conversation.md](docs/step9-multi-conversation.md)](docs/step8-v2.0-progress.md、[docs/step9-multi-conversation.md](docs/step9-multi-conversation.md))。
