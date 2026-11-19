@@ -18,7 +18,6 @@ interface PetState {
 const root = document.getElementById("pet-root") as HTMLElement;
 const stage = document.getElementById("pet-stage") as HTMLElement;
 const image = document.getElementById("pet-image") as HTMLImageElement;
-const head = document.getElementById("pet-head") as HTMLImageElement;
 const fallback = document.getElementById("pet-fallback") as HTMLElement;
 const nameEl = document.getElementById("pet-name") as HTMLElement;
 const statusEl = document.getElementById("pet-status") as HTMLElement;
@@ -34,7 +33,7 @@ const actionsPanel = document.getElementById("pet-actions") as HTMLElement | nul
 const actionList = document.getElementById("pet-action-list") as HTMLElement | null;
 const actionsClose = document.getElementById("pet-actions-close") as HTMLButtonElement | null;
 
-if (!root || !stage || !image || !head || !fallback || !nameEl || !statusEl || !bubble || !menu || !form || !input || !mic || !quick || !panel || !live2dHost) {
+if (!root || !stage || !image || !fallback || !nameEl || !statusEl || !bubble || !menu || !form || !input || !mic || !quick || !panel || !live2dHost) {
   throw new Error("PET_DOM_MISSING");
 }
 
@@ -94,8 +93,7 @@ async function syncLive2D(state: PetState): Promise<void> {
       live2dHandle = handle;
       live2dHost.hidden = false;
       image.hidden = true;
-      head.hidden = true;
-      fallback.hidden = true;
+        fallback.hidden = true;
       stage.classList.add("has-live2d");
     } else {
       stage.classList.remove("has-live2d");
@@ -253,17 +251,14 @@ function setChatOpen(next: boolean): void {
 function showStatic(state: PetState): void {
   if (live2dId !== null) {
     image.hidden = true;
-    head.hidden = true;
     fallback.hidden = true;
     return;
   }
   if (state.avatar) {
     image.hidden = false;
-    head.hidden = false;
     fallback.hidden = true;
   } else {
     image.hidden = true;
-    head.hidden = true;
     fallback.hidden = false;
   }
 }
@@ -296,7 +291,6 @@ function applyState(): void {
   live2dHandle?.setTalking(Boolean(state.talking));
   if (state.avatar) {
     image.src = state.avatar;
-    head.src = state.avatar;
   }
   showStatic(state);
   void syncLive2D(state);
