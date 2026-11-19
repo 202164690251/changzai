@@ -6,8 +6,13 @@ export interface Live2DImportProps {
   conversationId: string | null;
 }
 
+const RUNTIME_FILE = /\.(json|moc3|png|jpe?g|webp|wav|mp3|ogg)$/i;
+
 function zipToFiles(buffer: ArrayBuffer): File[] {
-  const entries = unzipSync(new Uint8Array(buffer));
+  // 先过滤再解压：大肥鱼这类模型带 130MB PSD，直接全解会卡死/超限。
+  const entries = unzipSync(new Uint8Array(buffer), {
+    filter: (file) => RUNTIME_FILE.test(file.name),
+  });
   return Object.entries(entries)
     .filter(([path, data]) => !path.endsWith("/") && data.length > 0)
     .map(([path, data]) => {

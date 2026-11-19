@@ -13,6 +13,7 @@ export interface Live2DHandle {
   tap: () => void;
   motions: string[];
   expressions: number;
+  expressionNames: string[];
   playMotion: (group: string) => void;
   playExpression: (index: number) => void;
   setTalking: (talking: boolean) => void;
@@ -33,6 +34,114 @@ function resolvePath(basePath: string, reference: string): string {
     else base.push(part);
   }
   return base.join("/");
+}
+
+
+interface VtubeHotkey {
+  Action?: string;
+  Name?: string;
+  File?: string;
+}
+
+interface VtubeSettings {
+  FileReferences?: {
+    IdleAnimation?: string;
+    IdleAnimationWhenTrackingLost?: string;
+  };
+  Hotkeys?: VtubeHotkey[];
+}
+
+function findFile(files: Record<string, Blob>, candidates: string[]): string | null {
+  for (const candidate of candidates) {
+    const normalized = candidate.replace(/^\.\//, "");
+    if (files[normalized]) return normalized;
+  }
+  return null;
+}
+
+/**
+ * VTube Studio 模型常把动作/表情放在 Animation、Exp3 目录，只在 .vtube.json
+ * 的 Hotkeys 里引用，model3.json 本身没有 Motions/Expressions。
+ * 这里把它们补进 model3，通用 Live2D 运行时才能播放。
+ */
+async function augmentVtubeModel(
+  raw: Record<string, unknown>,
+  modelPath: string,
+  files: Record<string, Blob>,
+): Promise<void> {
+  const vtubePath = Object.keys(files).find((path) => path.toLowerCase().endsWith(".vtube.json"));
+  if (!vtubePath) return;
+  let vtube: VtubeSettings;
+  try {
+    vtube = JSON.parse(await files[vtubePath]!.text()) as VtubeSettings;
+  } catch {
+    return;
+  }
+  const modelDir = modelPath.split("/").slice(0, -1);
+  const vtubeDir = vtubePath.split("/").slice(0, -1);
+  const resolve = (base: string[], reference: string): string => {
+    const parts = [...base, ...reference.split("/")];
+    const output: string[] = [];
+    for (const part of parts) {
+      if (part === "." || part === "") continue;
+      if (part === "..") output.pop();
+      else output.push(part);
+    }
+    return output.join("/");
+  };
+  const candidatesFor = (reference: string, subdir?: string): string[] => {
+    const list = [resolve(vtubeDir, reference), resolve(modelDir, reference)];
+    if (subdir) {
+      list.push(resolve(vtubeDir, `${subdir}/${reference}`), resolve(modelDir, `${subdir}/${reference}`));
+    }
+    return list;
+  };
+  const fileRefs = (raw.FileReferences ??= {}) as Record<string, unknown>;
+  const motions = (fileRefs.Motions ??= {}) as Record<string, unknown[]>;
+  const expressions = (fileRefs.Expressions ??= []) as Array<Record<string, unknown>>;
+  const addedMotions = new Set<string>();
+  const addMotion = (group: string, path: string): void => {
+    if (addedMotions.has(path)) return;
+    addedMotions.add(path);
+    motions[group] = [...(motions[group] ?? []), { File: path, FadeInTime: 0.2, FadeOutTime: 0.2 }];
+  };
+
+  const idleRef = vtube.FileReferences?.IdleAnimation;
+  if (idleRef) {
+    const idle = findFile(files, candidatesFor(idleRef, "Animation"));
+    if (idle) addMotion("Idle", idle);
+  }
+  if (!motions.Idle) {
+    const fallbackIdle = findFile(files, [
+      resolve(modelDir, "IDLE.motion3.json"),
+      resolve(modelDir, "Animation/IDLE.motion3.json"),
+    ]);
+    if (fallbackIdle) addMotion("Idle", fallbackIdle);
+  }
+
+  let index = 0;
+  for (const hotkey of vtube.Hotkeys ?? []) {
+    if (!hotkey.File) continue;
+    if (hotkey.Action === "TriggerAnimation") {
+      const path = findFile(files, candidatesFor(hotkey.File, "Animation"));
+      if (!path) continue;
+      index += 1;
+      addMotion(`动作${index}`, path);
+    } else if (hotkey.Action === "ToggleExpression") {
+      const path = findFile(files, candidatesFor(hotkey.File, "Exp3"));
+      if (!path) continue;
+      if (!expressions.some((item) => item.File === path)) {
+        expressions.push({ Name: hotkey.Name || `表情${expressions.length + 1}`, File: path });
+      }
+    }
+  }
+
+  // VTube 模型常用 JawOpen 做口型；补一个 LipSync 组给通用运行时识别。
+  const groups = (raw.Groups ??= []) as Array<{ Name?: string; Ids?: string[] }>;
+  const lipSync = groups.find((group) => group.Name === "LipSync");
+  if (lipSync && (!lipSync.Ids || lipSync.Ids.length === 0)) {
+    lipSync.Ids = ["JawOpen"];
+  }
 }
 
 function rewriteModel(
@@ -100,6 +209,7 @@ export async function mountLive2D(
     });
   }
   const raw = JSON.parse(await stored.files[stored.modelPath]!.text()) as Record<string, unknown>;
+  await augmentVtubeModel(raw, stored.modelPath, stored.files);
   const modelJson = rewriteModel(raw, stored.modelPath, urls);
 
   const app = new PIXI.Application({
@@ -156,12 +266,17 @@ export async function mountLive2D(
   const settings = model?.internalModel.settings as unknown as {
     motions?: Record<string, unknown>;
     expressions?: unknown[];
+    groups?: Array<{ Name?: string; Ids?: string[] }>;
   };
   const motions = Object.keys(settings?.motions ?? {});
-  const expressions = settings?.expressions?.length ?? 0;
+  const expressionItems = (settings?.expressions ?? []) as Array<{ Name?: string }>;
+  const expressions = expressionItems.length;
+  const expressionNames = expressionItems.map((item, index) => item.Name || `表情${index + 1}`);
   let talking = false;
   let mouthLevel = 0;
   let mouthTimer: number | null = null;
+  const lipSyncIds = settings?.groups?.find((group) => group.Name === "LipSync")?.Ids ?? [];
+  const mouthIds = lipSyncIds.length > 0 ? lipSyncIds : ["ParamMouthOpenY", "JawOpen"];
 
   const setTalking = (next: boolean): void => {
     talking = next;
@@ -177,7 +292,13 @@ export async function mountLive2D(
           const core = model.internalModel.coreModel as unknown as {
             setParameterValueById: (id: string, value: number) => void;
           };
-          core.setParameterValueById("ParamMouthOpenY", value);
+          for (const id of mouthIds) {
+            try {
+              core.setParameterValueById(id, value);
+            } catch {
+              /* 模型没有这个口型参数时尝试下一个 */
+            }
+          }
         } catch {
           /* 模型没有口型参数 */
         }
@@ -188,7 +309,13 @@ export async function mountLive2D(
         const core = model?.internalModel.coreModel as unknown as {
           setParameterValueById: (id: string, value: number) => void;
         };
-        core?.setParameterValueById("ParamMouthOpenY", 0);
+        for (const id of mouthIds) {
+          try {
+            core?.setParameterValueById(id, 0);
+          } catch {
+            /* 忽略 */
+          }
+        }
       } catch {
         /* 忽略 */
       }
@@ -211,6 +338,7 @@ export async function mountLive2D(
   return {
     motions,
     expressions,
+    expressionNames,
     resize: fit,
     tap: () => {
       play("Tap");
