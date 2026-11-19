@@ -1,0 +1,15 @@
+veyrimi 内置 OpenSSL 运行库说明
+================================
+
+本安装包包含以下 OpenSSL 3.x 运行库，用于 SQLCipher 加密数据库：
+
+- libcrypto-3-x64.dll
+- libssl-3-x64.dll
+
+OpenSSL 由 OpenSSL Project 开发，按 Apache License 2.0 授权：
+https://www.openssl.org/source/license.html
+
+Copyright 2003-2025 The OpenSSL Project Authors.
+Copyright 1995-1998 Eric A. Young, Tim J. Hudson.
+
+本文件仅用于满足运行库再分发时的许可说明；应用自身的代码与素材仍按项目自身授权。
