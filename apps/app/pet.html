@@ -4,7 +4,17 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>常在桌宠</title>
-    <script src="/live2dcubismcore.min.js"></script>
+    <script>
+      window.addEventListener("error", function (event) {
+        var status = document.querySelector("#pet-status span");
+        if (status) status.textContent = "桌宠脚本出错";
+        var bubble = document.getElementById("pet-bubble");
+        if (bubble) {
+          bubble.textContent = "桌宠脚本出错，请关闭后重新打开：" + (event.message || "未知错误");
+          bubble.hidden = false;
+        }
+      });
+    </script>    <script src="/live2dcubismcore.min.js"></script>
   </head>
   <body class="pet-body">
     <div id="pet-root">
@@ -33,9 +43,18 @@
       </div>
     </div>
 
+    <div id="pet-actions" class="pet-actions" hidden>
+      <header>
+        <strong>动作 / 表情</strong>
+        <button id="pet-actions-close" type="button" aria-label="关闭">×</button>
+      </header>
+      <div id="pet-action-list" class="pet-action-list"></div>
+    </div>
+
     <div id="pet-menu" class="pet-menu" hidden>
       <button type="button" data-action="chat">打开聊天</button>
       <button type="button" data-action="auto">自动动效</button>
+      <button type="button" data-action="actions">动作 / 表情…</button>
       <button type="button" data-action="motion">随机动作</button>
       <button type="button" data-action="expression">随机表情</button>
       <button type="button" data-action="pat">摸摸头</button>
