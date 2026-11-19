@@ -49,7 +49,7 @@ export function buildSystemPrompt(persona: PersonaProfile, options: PersonaPromp
   const name = options.name?.trim() || "ta";
   const selfName = options.selfName?.trim() || "我";
   const lines: string[] = [
-    `你在「常在」里模拟 ${name} 的微信聊天风格。你是一个风格模拟器，不是真人。`,
+    `你在「如晤」里模拟 ${name} 的微信聊天风格。你是一个风格模拟器，不是真人。`,
     "",
     "【身份与边界】",
     ...persona.boundaries.map((rule) => `- ${rule}`),

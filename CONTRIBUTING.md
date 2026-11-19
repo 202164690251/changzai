@@ -17,7 +17,7 @@
 | WebView2 Runtime | 已安装 | Windows 11 预装；Win10 由安装包内置 Bootstrapper |
 
 ```powershell
-git clone https://github.com/202164690251/changzai.git
+git clone https://github.com/202164690251/veyrimi.git
 cd changzai
 
 # 一次性：引导 Node/Rust/MSVC/Perl/NASM 到当前终端（每个新终端都要执行）
