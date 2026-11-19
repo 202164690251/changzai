@@ -1,5 +1,5 @@
 // Step 3 · 人格卡数据结构（纯类型，可被 core / UI 共用）
-import type { NormalizedMessage } from "@changzai/shared";
+import type { NormalizedMessage } from "@veyrimi/shared";
 
 export interface PersonaStyle {
   /** 平均每条消息字数（去空白） */

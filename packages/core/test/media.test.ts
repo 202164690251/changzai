@@ -12,7 +12,7 @@ import {
   mimeForPath,
   sanitizeMediaFileName,
 } from "../src/media/index.ts";
-import { MEDIA } from "@changzai/shared";
+import { MEDIA } from "@veyrimi/shared";
 
 test("extensionOf：常见路径与无扩展名", () => {
   assert.equal(extensionOf("C:\\media\\a.JPG"), "jpg");

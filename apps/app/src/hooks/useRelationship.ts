@@ -1,6 +1,6 @@
 // 关系卡：启动时从聊天记录本地总结一次；之后由用户编辑
 import { useCallback, useEffect, useRef, useState } from "react";
-import { deriveRelationshipProfile, type RelationshipProfile, type RelationshipSourceMessage } from "@changzai/core";
+import { deriveRelationshipProfile, type RelationshipProfile, type RelationshipSourceMessage } from "@veyrimi/core";
 import { api, isTauri, type ImportMessageRow } from "../lib/tauri.ts";
 
 const SETTING_KEY = "relationship.profile";

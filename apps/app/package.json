@@ -1,5 +1,5 @@
 {
-  "name": "@changzai/app",
+  "name": "@veyrimi/app",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -11,8 +11,8 @@
   },
   "dependencies": {
     "@ai-zen/live2d-core": "1.0.2",
-    "@changzai/core": "workspace:*",
-    "@changzai/shared": "workspace:*",
+    "@veyrimi/core": "workspace:*",
+    "@veyrimi/shared": "workspace:*",
     "@tauri-apps/api": "^2.9.0",
     "@tauri-apps/plugin-notification": "^2.3.0",
     "fflate": "0.8.2",

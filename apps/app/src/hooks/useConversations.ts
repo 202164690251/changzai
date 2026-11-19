@@ -1,6 +1,6 @@
 // 多会话：每个聊天有独立人格/关系/标题；消息按 payload.convId 归档
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { EmotionState, MoodOverride, PersonaProfile, ProactiveState, RelationshipProfile, StyleFeedback } from "@changzai/core";
+import type { EmotionState, MoodOverride, PersonaProfile, ProactiveState, RelationshipProfile, StyleFeedback } from "@veyrimi/core";
 import type { LlmConfig } from "../lib/tauri.ts";
 import { api, isTauri } from "../lib/tauri.ts";
 

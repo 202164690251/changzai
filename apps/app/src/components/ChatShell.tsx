@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactElement } from "react";
-import { DEFAULT_EMOTION, DEFAULT_PROACTIVE_STATE, buildCustomPersona, buildCustomRelationship, buildPresetPersona, buildPresetRelationship, type CustomPersonaForm, type PersonaPreset, type PersonaProfile, type RelationshipProfile } from "@changzai/core";
+import { DEFAULT_EMOTION, DEFAULT_PROACTIVE_STATE, buildCustomPersona, buildCustomRelationship, buildPresetPersona, buildPresetRelationship, type CustomPersonaForm, type PersonaPreset, type PersonaProfile, type RelationshipProfile } from "@veyrimi/core";
 import { listen } from "@tauri-apps/api/event";
 import { useChat, lastMessageOf, messagePreview, type ChatMsg } from "../hooks/useChat.ts";
 import { useAnalytics } from "../hooks/useAnalytics.ts";

@@ -7,7 +7,7 @@ import type {
   NormalizedMessage,
   RawMessage,
   Sender,
-} from "@changzai/shared";
+} from "@veyrimi/shared";
 
 const SENDER_MAP: Record<string, Sender> = {
   her: "her",

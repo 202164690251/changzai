@@ -15,7 +15,7 @@
 | Step 0 决策与准备 | [`docs/step0-decisions.md`](docs/step0-decisions.md)、[导出指引](docs/step0-data-export-guide.md)、[holdout 协议](docs/step0-holdout-protocol.md)、[设计基线](docs/step0-design-baseline.md) |
 | Step 1 spike 报告 | [`docs/step1-spike-report.md`](docs/step1-spike-report.md) |
 | 协作规范 | [`CONTRIBUTING.md`](CONTRIBUTING.md)（分支/PR/CI/隐私红线） |
-| 构建产物 | `release/changzai.exe`、`release/Changzai_0.1.0_x64-setup.exe`（未签名，内测用） |
+| 构建产物 | `release/veyrimi.exe`、`release/veyrimi_0.1.0_x64-setup.exe`（未签名，内测用） |
 | 一键验收 | `scripts/verify.ps1`（类型检查 + core 单测 + Rust 探针 + spike 套件） |
 
 ## 仓库结构
@@ -85,7 +85,7 @@ powershell -ExecutionPolicy Bypass -File scripts\build.ps1   # Windows 安装包
 | Step 1 FTS5 中文检索 | ✅ trigram recall@5 100%（Python + Rust 双验证） |
 | Step 1 托盘 + Windows 通知 | ✅ 代码 + Toast 能力验证 |
 | Step 1 Rust 流式 HTTP | ✅ 本地 chunked echo 测试通过 |
-| Step 1 安装包 | ✅ `release/Changzai_0.1.0_x64-setup.exe`（NSIS，未签名） |
+| Step 1 安装包 | ✅ `release/veyrimi_0.1.0_x64-setup.exe`（NSIS，未签名） |
 | UI：微信桌面版风格 | ✅ 三栏布局、双方头像、图片/语音气泡、设置抽屉 |
 | 双方昵称/头像自定义 | ✅ 设置页可改；已写入 SQLCipher `profile` 表（localStorage 双写兜底） |
 | 图片/语音素材导入 | ✅ 设置页导入 → 气泡展示；记录写入 `media` 表 |

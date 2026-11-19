@@ -1,5 +1,5 @@
 // 常在 · 导入适配器公共工具（WeChatMsg / 留痕 / QQ 等格式共用）
-import type { MessageType, RawMessage } from "@changzai/shared";
+import type { MessageType, RawMessage } from "@veyrimi/shared";
 import { isTimestampedLine } from "./plaintext.ts";
 
 /** 行首时间戳（支持 2023-05-20 14:03:22 / 2023/5/20 / 带方括号） */

@@ -1,6 +1,6 @@
 // 常在 · 导入适配器接口（插件式；新格式 = 加一个文件）
 
-import type { RawMessage } from "@changzai/shared";
+import type { RawMessage } from "@veyrimi/shared";
 
 export interface AdapterSource {
   /** 文件名（用于嗅探扩展名/表头） */

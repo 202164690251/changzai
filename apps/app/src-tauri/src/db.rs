@@ -127,7 +127,7 @@ pub fn db_probe(dir: Option<String>) -> DbProbeResult {
 
     let base: PathBuf = match dir {
         Some(d) => PathBuf::from(d),
-        None => std::env::temp_dir().join(format!("changzai-probe-{}", std::process::id())),
+        None => std::env::temp_dir().join(format!("veyrimi-probe-{}", std::process::id())),
     };
     if let Err(e) = fs::create_dir_all(&base) {
         result.error = Some(format!("create dir: {e}"));
@@ -297,7 +297,7 @@ mod tests {
 
     #[test]
     fn db_probe_passes() {
-        let dir = std::env::temp_dir().join(format!("changzai-dbprobe-test-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("veyrimi-dbprobe-test-{}", std::process::id()));
         let result = db_probe(Some(dir.display().to_string()));
         assert!(
             result.ok,

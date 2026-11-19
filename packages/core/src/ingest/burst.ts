@@ -1,8 +1,8 @@
 // 常在 · 行为信号补全：burst（连发）与 latency（响应延迟）
 // 依据 02 §4.2：同一发送者相邻间隔 <90s 记为一次连发；latency = 本条 ts - 上一条"对方"消息 ts，上限 86400s。
 
-import type { NormalizedMessage } from "@changzai/shared";
-import { INGEST } from "@changzai/shared";
+import type { NormalizedMessage } from "@veyrimi/shared";
+import { INGEST } from "@veyrimi/shared";
 import { sortMessages } from "./schema.ts";
 
 /** 计算 burst_index / burst_size（返回新数组，不修改入参） */

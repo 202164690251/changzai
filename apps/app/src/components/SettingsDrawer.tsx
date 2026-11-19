@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent, ReactElement } from "react";
-import { LLM_PROVIDERS, PROACTIVE_PRESETS, findProvider, personaHeadline, personaMbti, describeEmotion, weatherLabel, type EmotionState, type PersonaProfile, type ProactiveDesire, type ProactiveState, type RelationshipProfile } from "@changzai/core";
+import { LLM_PROVIDERS, PROACTIVE_PRESETS, findProvider, personaHeadline, personaMbti, describeEmotion, weatherLabel, type EmotionState, type PersonaProfile, type ProactiveDesire, type ProactiveState, type RelationshipProfile } from "@veyrimi/core";
 import type { ImportState } from "../hooks/useMediaImport.ts";
 import type { VoiceSettings } from "../hooks/useConversations.ts";
 import { readPetImageFile } from "../lib/avatar.ts";

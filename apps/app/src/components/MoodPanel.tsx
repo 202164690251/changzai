@@ -1,7 +1,7 @@
 // 「ta 现在的状态」：用户可手动覆盖，不常驻聊天区
 import { useEffect, useState } from "react";
 import type { ReactElement } from "react";
-import { MOOD_PRESETS, moodPresetState, type EmotionState } from "@changzai/core";
+import { MOOD_PRESETS, moodPresetState, type EmotionState } from "@veyrimi/core";
 
 export interface MoodPanelProps {
   open: boolean;

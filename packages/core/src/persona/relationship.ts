@@ -1,5 +1,5 @@
 // 常在 · 关系卡：从聊天记录里先做一次可解释的本地总结，再由用户编辑确认
-import type { NormalizedMessage } from "@changzai/shared";
+import type { NormalizedMessage } from "@veyrimi/shared";
 
 export type RelationshipType = "情侣" | "前任" | "暗恋" | "朋友" | "亲人" | "同事" | "其他";
 

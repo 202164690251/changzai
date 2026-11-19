@@ -20,10 +20,10 @@ importers:
       '@ai-zen/live2d-core':
         specifier: 1.0.2
         version: 1.0.2
-      '@changzai/core':
+      '@veyrimi/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@changzai/shared':
+      '@veyrimi/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       '@tauri-apps/api':
@@ -72,7 +72,7 @@ importers:
 
   packages/core:
     dependencies:
-      '@changzai/shared':
+      '@veyrimi/shared':
         specifier: workspace:*
         version: link:../shared
     devDependencies:

@@ -1,7 +1,7 @@
 // Step 6 · 四步引导：说明/18+ → 导入 → 人格卡 → 模型配置
 import { useState } from "react";
 import type { ReactElement } from "react";
-import { LLM_PROVIDERS, findProvider, personaHeadline, type PersonaProfile } from "@changzai/core";
+import { LLM_PROVIDERS, findProvider, personaHeadline, type PersonaProfile } from "@veyrimi/core";
 import type { DbStats, LlmConfig } from "../lib/tauri.ts";
 import type { ImportState } from "../hooks/useImport.ts";
 

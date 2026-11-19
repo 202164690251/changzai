@@ -7,7 +7,7 @@
 // - type=49 的引用消息优先用 content（回复文字），为空时用 contents.refer.content；
 // - 图片/视频/表情/通话保留原类型，不参与人格卡。
 
-import type { RawMessage } from "@changzai/shared";
+import type { RawMessage } from "@veyrimi/shared";
 import type { AdapterSource, IngestAdapter } from "./base.ts";
 import { mapWechatType, senderFromFlag, senderFromName } from "./common.ts";
 
