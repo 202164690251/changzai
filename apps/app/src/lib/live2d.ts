@@ -326,6 +326,13 @@ export async function mountLive2D(
   const playExpression = (index: number): void => {
     if (!model || expressions === 0) return;
     try {
+      // VTube 的 exp3 多数是 Add；先清掉上一个表达式，体型/衣服才能正确切换，
+      // 否则 0.4 + 1.0 会叠加成错误值。
+      const manager = model.internalModel.motionManager.expressionManager as
+        | { resetExpression?: () => void }
+        | null
+        | undefined;
+      manager?.resetExpression?.();
       const result = model.expression(index % expressions);
       if (result && typeof result.catch === "function") result.catch(() => undefined);
     } catch {
