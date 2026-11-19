@@ -47,11 +47,11 @@ export function Onboarding({
   const back = (): void => setStep((current) => Math.max(0, current - 1));
 
   return (
-    <div className="onboarding-root" role="dialog" aria-modal="true" aria-label="常在引导">
+    <div className="onboarding-root" role="dialog" aria-modal="true" aria-label="如晤引导">
       <section className="onboarding-card">
         <header className="onboarding-head">
           <div>
-            <strong>常在 Still Here</strong>
+            <strong>veyrimi · 如晤</strong>
             <span className="onboarding-step">
               {step + 1}/{STEPS.length} · {STEPS[step]}
             </span>
@@ -204,7 +204,7 @@ export function Onboarding({
                   onFinish();
                 }}
               >
-                保存并进入常在
+                保存并进入如晤
               </button>
             </div>
           </div>

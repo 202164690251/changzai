@@ -1,4 +1,4 @@
-// 常在 · 本地资料（双方昵称 / 头像）
+// 如晤 · 本地资料（双方昵称 / 头像）
 // Step 2 会把这份资料写进数据库；当前先落 localStorage，键名固定为 changzai.profile.v1。
 
 export interface PersonProfile {

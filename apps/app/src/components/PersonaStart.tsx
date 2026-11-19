@@ -108,7 +108,7 @@ export function PersonaStart({
       <section className="persona-start-card">
         <header className="persona-start-head">
           <div>
-            <strong>常在 Still Here</strong>
+            <strong>veyrimi · 如晤</strong>
             <span>{mode === "home" ? "先决定怎么认识 ta" : mode === "custom" || mode === "customPreview" ? "自己写一个" : "选一个性格"}</span>
           </div>
           <button type="button" className="link-btn" onClick={onSkip}>

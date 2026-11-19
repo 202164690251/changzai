@@ -94,7 +94,7 @@ pub(crate) fn open(app: &AppHandle) -> Result<bool, String> {
     let initial_size = read_size(app);
     let (initial_width, initial_height) = layout_for(initial_size, false);
     let mut builder = WebviewWindowBuilder::new(app, PET_LABEL, WebviewUrl::App("pet.html".into()))
-        .title("常在桌宠")
+        .title("如晤桌宠")
         .inner_size(initial_width, initial_height)
         .decorations(false)
         .transparent(true)

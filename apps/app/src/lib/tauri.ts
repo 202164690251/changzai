@@ -286,7 +286,7 @@ export const api = {
   async notifyProbe(): Promise<NotifyProbeResult> {
     requireTauri();
     return invoke<NotifyProbeResult>("notify_probe", {
-      title: "常在 · 技术自检",
+      title: "如晤 · 技术自检",
       body: "如果你看到这条通知，说明 Windows 通知链路可用。这条不是 ta 发的。",
     });
   },

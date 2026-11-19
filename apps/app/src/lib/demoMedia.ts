@@ -1,4 +1,4 @@
-// 常在 · 演示素材（不依赖任何外部网络图片）
+// 如晤 · 演示素材（不依赖任何外部网络图片）
 // 图片是一条内联 SVG；语音是一段在本地合成的短促气声 WAV，用来演示语音气泡，不需要联网。
 
 const DEMO_IMAGE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="960" height="720" viewBox="0 0 480 360">

@@ -2347,3 +2347,9 @@ textarea:focus-visible {
 .pet-behavior-settings .settings-field {
   margin: 0;
 }
+.lock-brand-mark {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  align-self: flex-start;
+}

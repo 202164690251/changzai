@@ -14,9 +14,10 @@ export function LockScreen({ open, error, onUnlock, onForgot }: LockScreenProps)
   const [busy, setBusy] = useState(false);
   if (!open) return null;
   return (
-    <div className="lock-root" role="dialog" aria-modal="true" aria-label="解锁常在">
+    <div className="lock-root" role="dialog" aria-modal="true" aria-label="解锁如晤">
       <div className="lock-card">
-        <h1>常在</h1>
+        <img className="lock-brand-mark" src="/brand/brand-mark.png" alt="" />
+        <h1>如晤</h1>
         <p>输入 PIN 继续。数据只在这台电脑上。</p>
         <input
           className="text-input"

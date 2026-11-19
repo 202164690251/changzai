@@ -332,7 +332,7 @@ pub async fn backup_export(app: tauri::AppHandle, passphrase: String) -> Result<
         .file()
         .set_title("选择备份保存位置")
         .set_file_name("changzai-backup.czbak")
-        .add_filter("常在备份", &["czbak"])
+        .add_filter("如晤备份", &["czbak"])
         .save_file(move |path| {
             let _ = tx.send(path);
         });
@@ -360,7 +360,7 @@ pub async fn backup_restore(app: tauri::AppHandle, passphrase: String) -> Result
     app.dialog()
         .file()
         .set_title("选择 .czbak 备份")
-        .add_filter("常在备份", &["czbak"])
+        .add_filter("如晤备份", &["czbak"])
         .pick_file(move |path| {
             let _ = tx.send(path);
         });
@@ -376,7 +376,7 @@ pub async fn backup_restore(app: tauri::AppHandle, passphrase: String) -> Result
     let db_path = import_at(&dir, &passphrase, &source)?;
     Ok(RestoreResult {
         ok: true,
-        message: "恢复完成。请重启常在，让新数据库生效。".to_string(),
+        message: "恢复完成。请重启如晤，让新数据库生效。".to_string(),
         backup_path: db_path.display().to_string(),
     })
 }

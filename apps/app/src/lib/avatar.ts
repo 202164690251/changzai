@@ -1,4 +1,4 @@
-// 常在 · 头像工具：名字首字 + 稳定颜色；点选本地图片后转 dataURL 并等比压缩。
+// 如晤 · 头像工具：名字首字 + 稳定颜色；点选本地图片后转 dataURL 并等比压缩。
 
 const AVATAR_COLORS = [
   "#6E8FB8",
@@ -16,7 +16,7 @@ export const MAX_CHAT_IMAGE_BYTES = 8 * 1024 * 1024;
 
 /** 同一个名字永远拿到同一种颜色，换名字会换颜色。 */
 export function avatarColor(seed: string): string {
-  const key = seed.trim() || "常在";
+  const key = seed.trim() || "如晤";
   let hash = 0;
   for (let index = 0; index < key.length; index += 1) {
     hash = (hash * 31 + key.charCodeAt(index)) % 100_000;
