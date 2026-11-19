@@ -38,16 +38,16 @@ if (!root || !stage || !image || !fallback || !nameEl || !statusEl || !bubble ||
 }
 
 const LINES = ["在呢", "怎么啦？", "我在这儿", "嗯？", "想我啦？", "来啦来啦"];
-const LIVE2D_CANVAS = 480;
+const LIVE2D_CANVAS = 1024;
 let lastTs = 0;
 let bubbleTimer: number | null = null;
 let menuOpen = false;
 let chatOpen = false;
-let stageSize = 240;
+let stageSize = 280;
 let resizing = false;
 let resizeStartX = 0;
 let resizeStartY = 0;
-let resizeStartSize = 240;
+let resizeStartSize = 280;
 let layoutTimer = 0;
 let live2dHandle: {
   destroy: () => void;
@@ -58,6 +58,7 @@ let live2dHandle: {
   expressionNames: string[];
   playMotion: (group: string) => void;
   playExpression: (index: number) => void;
+  resetExpression: () => void;
   setTalking: (talking: boolean) => void;
   setMouthLevel: (level: number) => void;
   hitTest: (x: number, y: number) => string[];
@@ -260,7 +261,7 @@ function scheduleLayout(): void {
 }
 
 function applyStageSize(next: number, persist = true): void {
-  const maxStage = Math.max(180, Math.min(480, window.screen.availWidth - 80, window.screen.availHeight - 230));
+  const maxStage = Math.max(240, Math.min(1200, window.screen.availWidth - 80, window.screen.availHeight - 230));
   stageSize = Math.max(140, Math.min(maxStage, Math.round(next)));
   document.documentElement.style.setProperty("--pet-size", `${stageSize}px`);
   live2dHandle?.resize();
@@ -496,6 +497,14 @@ window.addEventListener("contextmenu", (event) => {
   menu.style.top = `${Math.max(4, y)}px`;
 });
 
+function flashActionFeedback(label: string): void {
+  showBubble(label);
+  stage.classList.remove("is-action-feedback");
+  void stage.offsetWidth;
+  stage.classList.add("is-action-feedback");
+  window.setTimeout(() => stage.classList.remove("is-action-feedback"), 520);
+}
+
 function openActionPanel(): void {
   hideMenu();
   if (!actionsPanel || !actionList) {
@@ -513,6 +522,7 @@ function openActionPanel(): void {
     button.textContent = label;
     button.addEventListener("click", () => {
       onClick();
+      flashActionFeedback(label);
       if (actionsPanel) actionsPanel.hidden = true;
     });
     actionList.appendChild(button);
@@ -534,6 +544,7 @@ function openActionPanel(): void {
     for (let index = 0; index < live2dHandle.expressions; index += 1) {
       addButton(live2dHandle.expressionNames[index] ?? `表情 ${index + 1}`, () => live2dHandle?.playExpression(index));
     }
+    addButton("恢复默认表情", () => live2dHandle?.resetExpression());
   }
   if (actionList.childElementCount === 0) {
     actionList.textContent = "这个模型没有可选动作或表情";
@@ -553,7 +564,7 @@ function randomMotion(): void {
   const groups = live2dHandle.motions;
   const group = groups[Math.floor(Math.random() * groups.length)] ?? groups[0];
   if (group) live2dHandle.playMotion(group);
-  showBubble(`动作：${group ?? "默认"}`);
+  flashActionFeedback(`动作：${group ?? "默认"}`);
 }
 
 function randomExpression(): void {
@@ -563,7 +574,7 @@ function randomExpression(): void {
   }
   const index = Math.floor(Math.random() * live2dHandle.expressions);
   live2dHandle.playExpression(index);
-  showBubble(live2dHandle.expressionNames[index] ?? "换了个表情");
+  flashActionFeedback(`表情：${live2dHandle.expressionNames[index] ?? "默认"}`);
 }
 
 function toggleAuto(): void {
@@ -670,7 +681,7 @@ window.addEventListener("blur", hideMenu);
 
 void invoke<{ size: number; chatOpen: boolean }>("pet_get_layout")
   .then((layout) => {
-    stageSize = Number.isFinite(layout.size) ? layout.size : 240;
+    stageSize = Number.isFinite(layout.size) ? layout.size : 280;
     applyStageSize(stageSize, false);
     if (layout.chatOpen) {
       chatOpen = true;

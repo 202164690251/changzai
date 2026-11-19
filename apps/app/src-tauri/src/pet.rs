@@ -8,7 +8,7 @@ const MINI_KEY: &str = "pet.mini";
 const SIZE_KEY: &str = "pet.size";
 const CHAT_KEY: &str = "pet.chat_open";
 const MIN_STAGE: f64 = 140.0;
-const MAX_STAGE: f64 = 480.0;
+const MAX_STAGE: f64 = 1200.0;
 
 #[derive(Debug, Clone, Deserialize)]
 struct SavedPosition {
@@ -27,7 +27,7 @@ fn read_size(app: &AppHandle) -> f64 {
         .ok()
         .and_then(|dir| crate::store::read_setting_at(&dir, SIZE_KEY).ok().flatten())
         .and_then(|value| value.parse::<f64>().ok())
-        .unwrap_or(240.0)
+        .unwrap_or(280.0)
         .clamp(MIN_STAGE, MAX_STAGE)
 }
 

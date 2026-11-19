@@ -16,6 +16,7 @@ export interface Live2DHandle {
   expressionNames: string[];
   playMotion: (group: string) => void;
   playExpression: (index: number) => void;
+  resetExpression: () => void;
   setTalking: (talking: boolean) => void;
   setMouthLevel: (level: number) => void;
   hitTest: (x: number, y: number) => string[];
@@ -332,6 +333,18 @@ export async function mountLive2D(
     }
   };
 
+  const resetExpression = (): void => {
+    try {
+      const manager = model?.internalModel.motionManager.expressionManager as
+        | { resetExpression?: () => void }
+        | null
+        | undefined;
+      manager?.resetExpression?.();
+    } catch {
+      /* 忽略 */
+    }
+  };
+
   // 有 Idle 组的模型自动进入待机；没有就保持第一帧
   play("Idle");
 
@@ -345,6 +358,7 @@ export async function mountLive2D(
     },
     playMotion: play,
     playExpression,
+    resetExpression,
     setTalking,
     setMouthLevel: (level: number) => {
       mouthLevel = Math.max(0, Math.min(1, level));
