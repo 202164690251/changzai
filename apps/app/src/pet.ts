@@ -30,11 +30,11 @@ const mic = document.getElementById("pet-mic") as HTMLButtonElement;
 const quick = document.getElementById("pet-quick") as HTMLElement;
 const panel = document.getElementById("pet-chat-panel") as HTMLElement;
 const live2dHost = document.getElementById("pet-live2d") as HTMLElement;
-const actionsPanel = document.getElementById("pet-actions") as HTMLElement;
-const actionList = document.getElementById("pet-action-list") as HTMLElement;
-const actionsClose = document.getElementById("pet-actions-close") as HTMLButtonElement;
+const actionsPanel = document.getElementById("pet-actions") as HTMLElement | null;
+const actionList = document.getElementById("pet-action-list") as HTMLElement | null;
+const actionsClose = document.getElementById("pet-actions-close") as HTMLButtonElement | null;
 
-if (!root || !stage || !image || !head || !fallback || !nameEl || !statusEl || !bubble || !menu || !actionsPanel || !actionList || !actionsClose || !form || !input || !mic || !quick || !panel || !live2dHost) {
+if (!root || !stage || !image || !head || !fallback || !nameEl || !statusEl || !bubble || !menu || !form || !input || !mic || !quick || !panel || !live2dHost) {
   throw new Error("PET_DOM_MISSING");
 }
 
@@ -498,6 +498,10 @@ window.addEventListener("contextmenu", (event) => {
 
 function openActionPanel(): void {
   hideMenu();
+  if (!actionsPanel || !actionList) {
+    showBubble("动作面板不可用");
+    return;
+  }
   if (!live2dHandle) {
     showBubble("当前没有 Live2D 模型");
     return;
@@ -509,7 +513,7 @@ function openActionPanel(): void {
     button.textContent = label;
     button.addEventListener("click", () => {
       onClick();
-      actionsPanel.hidden = true;
+      if (actionsPanel) actionsPanel.hidden = true;
     });
     actionList.appendChild(button);
   };
@@ -537,8 +541,8 @@ function openActionPanel(): void {
   actionsPanel.hidden = false;
 }
 
-actionsClose.addEventListener("click", () => {
-  actionsPanel.hidden = true;
+actionsClose?.addEventListener("click", () => {
+  if (actionsPanel) actionsPanel.hidden = true;
 });
 
 function randomMotion(): void {
