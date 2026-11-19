@@ -371,6 +371,18 @@ export const api = {
     requireTauri();
     return invoke<boolean>("pet_is_open");
   },
+  async videoCallOpen(): Promise<boolean> {
+    requireTauri();
+    return invoke<boolean>("video_call_open");
+  },
+  async videoCallClose(): Promise<boolean> {
+    requireTauri();
+    return invoke<boolean>("video_call_close");
+  },
+  async videoCallIsOpen(): Promise<boolean> {
+    requireTauri();
+    return invoke<boolean>("video_call_is_open");
+  },
   async sttTranscribe(audioBase64: string): Promise<SttResult> {
     requireTauri();
     return invoke<SttResult>("stt_transcribe", { request: { audioBase64 } });

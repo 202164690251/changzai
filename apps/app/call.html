@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>视频通话 · 常在</title>
+  </head>
+  <body>
+    <div id="call-root" class="call-root">
+      <header class="call-header">
+        <div>
+          <p class="call-eyebrow">VIRTUAL CALL</p>
+          <h1>和 <span id="call-name">ta</span> 视频中</h1>
+        </div>
+        <span class="call-local">本地形象 · 不录像</span>
+      </header>
+
+      <main class="call-stage">
+        <div id="call-avatar" class="call-avatar" aria-label="虚拟形象"></div>
+        <img id="call-image" class="call-image" alt="" hidden />
+        <div id="call-fallback" class="call-fallback" hidden>ta</div>
+        <div id="call-subtitle" class="call-subtitle"></div>
+
+        <div id="call-accept" class="call-accept">
+          <p class="call-accept-name" id="call-accept-name">ta</p>
+          <p class="call-accept-hint">正在等你接通</p>
+          <button id="call-accept-btn" type="button" class="call-accept-btn">接通</button>
+        </div>
+      </main>
+
+      <p id="call-error" class="call-error" hidden></p>
+
+      <footer class="call-controls">
+        <div class="call-control-wrap">
+          <button id="call-mute" type="button" class="call-control" aria-label="静音">静音</button>
+          <span class="call-control-label">声音</span>
+        </div>
+        <div class="call-control-wrap">
+          <button id="call-hangup" type="button" class="call-control is-hangup" aria-label="挂断">挂断</button>
+          <span class="call-control-label">关闭并回聊天</span>
+        </div>
+      </footer>
+
+      <p id="call-status" class="call-status">等待接通</p>
+    </div>
+    <script type="module" src="/src/call.ts"></script>
+  </body>
+</html>

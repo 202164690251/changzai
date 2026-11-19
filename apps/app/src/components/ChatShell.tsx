@@ -215,6 +215,40 @@ export function ChatShell(): ReactElement {
     }
   }, [show]);
 
+  const handleVideoCall = useCallback(async (): Promise<void> => {
+    if (!activeConversation) {
+      show("先选一个聊天再视频");
+      return;
+    }
+    if (!isTauri()) {
+      show("视频通话只在桌面版可用");
+      return;
+    }
+    const lastHerText = [...messages]
+      .reverse()
+      .find(
+        (message): message is Extract<ChatMsg, { kind: "text" }> =>
+          message.from === "her" && message.kind === "text" && message.text.trim().length > 0,
+      );
+    const text = lastHerText?.text.trim() || "你来啦，我刚还在想你。";
+    try {
+      localStorage.setItem(
+        "call.state",
+        JSON.stringify({
+          version: 1,
+          name: her.name,
+          avatar: her.avatar,
+          conversationId: activeConversation.id,
+          text,
+          voice: voiceSettings,
+        }),
+      );
+      await api.videoCallOpen();
+    } catch (error) {
+      show(error instanceof Error ? error.message : "视频窗口没有打开");
+    }
+  }, [activeConversation, her, messages, show, voiceSettings]);
+
   const handlePetImageChange = useCallback(
     (dataUrl: string | null) => {
       if (!activeConversation) return;
@@ -1005,6 +1039,7 @@ export function ChatShell(): ReactElement {
           her={her}
           typing={typing}
           onOpenSettings={() => setSettingsOpen(true)}
+          onVideoCall={() => void handleVideoCall()}
           onRecall={recallLastMessage}
           onMemory={() => setMemoryOpen(true)}
           onMood={() => setMoodOpen(true)}

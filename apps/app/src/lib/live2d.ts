@@ -82,7 +82,11 @@ function rewriteModel(
   return raw;
 }
 
-export async function mountLive2D(host: HTMLElement, conversationId: string): Promise<Live2DHandle | null> {
+export async function mountLive2D(
+  host: HTMLElement,
+  conversationId: string,
+  canvasSize = CANVAS_SIZE,
+): Promise<Live2DHandle | null> {
   const stored = await loadLive2D(conversationId);
   if (!stored) return null;
 
@@ -99,8 +103,8 @@ export async function mountLive2D(host: HTMLElement, conversationId: string): Pr
   const modelJson = rewriteModel(raw, stored.modelPath, urls);
 
   const app = new PIXI.Application({
-    width: CANVAS_SIZE,
-    height: CANVAS_SIZE,
+    width: canvasSize,
+    height: canvasSize,
     backgroundAlpha: 0,
     antialias: true,
     autoDensity: true,
@@ -119,10 +123,10 @@ export async function mountLive2D(host: HTMLElement, conversationId: string): Pr
     // 用模型原始画布尺寸计算，不能用已缩放后的 model.width，否则 resize 会越缩越大
     const width = model.internalModel.originalWidth || model.internalModel.width || model.width || 1;
     const height = model.internalModel.originalHeight || model.internalModel.height || model.height || 1;
-    const scale = Math.min(CANVAS_SIZE / width, CANVAS_SIZE / height) * 0.96;
+    const scale = Math.min(canvasSize / width, canvasSize / height) * 0.96;
     model.scale.set(scale);
     model.anchor.set(0.5, 0.5);
-    model.position.set(CANVAS_SIZE / 2, CANVAS_SIZE / 2);
+    model.position.set(canvasSize / 2, canvasSize / 2);
   };
 
   try {

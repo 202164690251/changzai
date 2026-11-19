@@ -8,6 +8,7 @@ mod store;
 mod stt;
 mod tray;
 mod tts;
+mod video;
 
 use serde::Serialize;
 use tauri::WindowEvent;
@@ -114,6 +115,9 @@ pub fn run() {
             pet::pet_set_mini,
             pet::pet_set_chat_open,
             pet::pet_get_mini,
+            video::video_call_open,
+            video::video_call_close,
+            video::video_call_is_open,
             safety::pin_enabled
         ])
         .setup(|app| {
@@ -123,6 +127,10 @@ pub fn run() {
         })
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {
+                // 视频窗口允许真正关闭；主窗口/桌宠仍然隐藏到托盘
+                if window.label() == "video_call" {
+                    return;
+                }
                 let _ = window.hide();
                 api.prevent_close();
             }

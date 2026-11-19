@@ -1,0 +1,233 @@
+:root {
+  color-scheme: dark;
+  font-family: "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+  background: #0c1512;
+  color: #eef7f2;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 100vw;
+  min-height: 100vh;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 30%, rgba(69, 132, 101, 0.28), transparent 45%),
+    linear-gradient(160deg, #0b1311 0%, #111e19 55%, #0a100e 100%);
+}
+
+.call-root {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  padding: 22px 30px 18px;
+}
+
+.call-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.call-eyebrow {
+  margin: 0 0 4px;
+  color: #7fb99b;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+}
+
+.call-header h1 {
+  margin: 0;
+  color: #f2faf6;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.call-header h1 span {
+  color: #8fd3b0;
+}
+
+.call-local {
+  padding: 5px 9px;
+  border: 1px solid rgba(143, 211, 176, 0.28);
+  border-radius: 999px;
+  color: #9cc9b3;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.call-stage {
+  position: relative;
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+}
+
+.call-avatar {
+  width: 420px;
+  height: 420px;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.call-avatar canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.call-image {
+  width: 380px;
+  height: 380px;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 30px;
+  filter: drop-shadow(0 24px 50px rgba(0, 0, 0, 0.35));
+}
+
+.call-fallback {
+  display: grid;
+  width: 240px;
+  height: 240px;
+  place-items: center;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #4f9b77, #2c5d47);
+  color: #eafff4;
+  font-size: 88px;
+  font-weight: 600;
+}
+
+.call-subtitle {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  width: min(620px, 88%);
+  transform: translateX(-50%);
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(5, 12, 9, 0.62);
+  color: #e9f7ef;
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: center;
+  backdrop-filter: blur(10px);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+.call-subtitle.is-visible {
+  opacity: 1;
+}
+
+.call-accept {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border-radius: 22px;
+  background: rgba(8, 18, 14, 0.74);
+  backdrop-filter: blur(8px);
+}
+
+.call-accept[hidden] {
+  display: none;
+}
+
+.call-accept-name {
+  margin: 0;
+  color: #eafff4;
+  font-size: 26px;
+  font-weight: 600;
+}
+
+.call-accept-hint {
+  margin: 0 0 18px;
+  color: #93b9a7;
+  font-size: 12px;
+}
+
+.call-accept-btn {
+  min-width: 132px;
+  padding: 10px 22px;
+  border: 0;
+  border-radius: 999px;
+  background: #4f9b77;
+  color: #f4fff9;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.call-accept-btn:hover {
+  background: #5bad85;
+}
+
+.call-error {
+  margin: 6px 0 0;
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: rgba(145, 58, 58, 0.28);
+  color: #ffd6d6;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.call-controls {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 44px;
+  padding-top: 12px;
+}
+
+.call-control-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+
+.call-control {
+  min-width: 76px;
+  padding: 8px 14px;
+  border: 1px solid rgba(159, 203, 181, 0.28);
+  border-radius: 999px;
+  background: rgba(22, 42, 33, 0.8);
+  color: #d9eee3;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.call-control:hover {
+  background: rgba(38, 68, 53, 0.9);
+}
+
+.call-control.is-hangup {
+  border-color: rgba(224, 124, 124, 0.4);
+  background: rgba(92, 34, 34, 0.72);
+  color: #ffdada;
+}
+
+.call-control-label {
+  color: #7f9c8e;
+  font-size: 9px;
+}
+
+.call-status {
+  min-height: 14px;
+  margin: 8px 0 0;
+  color: #7f9c8e;
+  font-size: 10px;
+  text-align: center;
+}
