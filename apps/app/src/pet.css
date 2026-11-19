@@ -119,13 +119,18 @@ body {
 .pet-menu {
   position: fixed;
   z-index: 40;
+  max-height: calc(100vh - 8px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 5px;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.97);
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.2);
+  scrollbar-width: thin;
 }
 .pet-menu button {
   display: block;
+  flex: 0 0 auto;
   width: 120px;
   padding: 7px 9px;
   border: 0;

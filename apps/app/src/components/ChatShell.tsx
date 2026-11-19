@@ -231,14 +231,28 @@ export function ChatShell(): ReactElement {
           message.from === "her" && message.kind === "text" && message.text.trim().length > 0,
       );
     const text = lastHerText?.text.trim() || "你来啦，我刚还在想你。";
+    let petId: string | null = null;
+    let petImage: string | null = null;
+    try {
+      const petState = JSON.parse(localStorage.getItem("pet.state") ?? "{}") as {
+        id?: string;
+        avatar?: string | null;
+      };
+      petId = petState.id ?? null;
+      petImage = petState.avatar ?? null;
+    } catch {
+      /* 忽略 */
+    }
     try {
       localStorage.setItem(
         "call.state",
         JSON.stringify({
-          version: 1,
+          version: 2,
           name: her.name,
           avatar: her.avatar,
+          petImage: activeConversation.petImage ?? petImage,
           conversationId: activeConversation.id,
+          fallbackConversationId: petId,
           text,
           voice: voiceSettings,
         }),

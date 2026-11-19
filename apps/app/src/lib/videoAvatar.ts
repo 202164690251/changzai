@@ -8,6 +8,8 @@ export interface VideoAvatarConfig {
   name: string;
   avatar: string | null;
   conversationId: string | null;
+  fallbackConversationId?: string | null;
+  petImage?: string | null;
   canvasSize?: number;
 }
 
@@ -19,6 +21,7 @@ export interface VideoAvatarElements {
 
 export interface VideoAvatarSession {
   readonly kind: "live2d" | "image";
+  warning?: string;
   speak(text: string, voice: VoiceSettings): Promise<void>;
   setMuted(muted: boolean): void;
   stopAudio(): void;
@@ -36,11 +39,14 @@ export class LocalVideoAvatarProvider implements VideoAvatarProvider {
 
   async start(config: VideoAvatarConfig, elements: VideoAvatarElements): Promise<VideoAvatarSession> {
     let live2d: Live2DHandle | null = null;
-    if (config.conversationId) {
+    let loadError: string | null = null;
+    const ids = [...new Set([config.conversationId, config.fallbackConversationId].filter(Boolean))] as string[];
+    for (const id of ids) {
       try {
-        live2d = await mountLive2D(elements.host, config.conversationId, config.canvasSize ?? 420);
-      } catch {
-        live2d = null;
+        live2d = await mountLive2D(elements.host, id, config.canvasSize ?? 420);
+        if (live2d) break;
+      } catch (error) {
+        loadError = error instanceof Error ? error.message : String(error);
       }
     }
     if (live2d) {
@@ -49,8 +55,9 @@ export class LocalVideoAvatarProvider implements VideoAvatarProvider {
       elements.fallback.hidden = true;
     } else {
       elements.host.hidden = true;
-      if (config.avatar) {
-        elements.image.src = config.avatar;
+      const fallbackImage = config.petImage || config.avatar;
+      if (fallbackImage) {
+        elements.image.src = fallbackImage;
         elements.image.hidden = false;
         elements.fallback.hidden = true;
       } else {
@@ -76,6 +83,11 @@ export class LocalVideoAvatarProvider implements VideoAvatarProvider {
 
     const session: VideoAvatarSession = {
       kind: live2d ? "live2d" : "image",
+      warning: live2d
+        ? undefined
+        : loadError
+          ? `Live2D 加载失败，已回退图片：${loadError}`
+          : "当前聊天没有可用的 Live2D 模型，已回退图片",
       async speak(text: string, voice: VoiceSettings): Promise<void> {
         session.stopAudio();
         const result = await api.ttsSpeak({
