@@ -1,7 +1,11 @@
 // Cubism 4 模型渲染。模型文件从 IndexedDB 取出，重写成 blob URL 后交给 pixi-live2d-display。
 import * as PIXI from "pixi.js";
-import { Live2DModel } from "pixi-live2d-display/cubism4";
+import type { Live2DModel as Live2DModelClass } from "pixi-live2d-display/cubism4";
 import { loadLive2D } from "./live2dStore.ts";
+
+// pixi-live2d-display 需要从 window.PIXI.Ticker 驱动模型更新；
+// 必须在动态 import 插件之前挂上去，否则模型只会渲染第一帧。
+(window as unknown as { PIXI: typeof PIXI }).PIXI = PIXI;
 
 export interface Live2DHandle {
   destroy: () => void;
@@ -109,7 +113,7 @@ export async function mountLive2D(host: HTMLElement, conversationId: string): Pr
   canvas.style.pointerEvents = "none";
   host.replaceChildren(canvas);
 
-  let model: Live2DModel | null = null;
+  let model: Live2DModelClass | null = null;
   const fit = (): void => {
     if (!model) return;
     // 用模型原始画布尺寸计算，不能用已缩放后的 model.width，否则 resize 会越缩越大
@@ -122,6 +126,8 @@ export async function mountLive2D(host: HTMLElement, conversationId: string): Pr
   };
 
   try {
+    const { Live2DModel } = await import("pixi-live2d-display/cubism4");
+    Live2DModel.registerTicker(PIXI.Ticker);
     model = await Live2DModel.from(
       modelJson as unknown as Parameters<typeof Live2DModel.from>[0],
       { autoInteract: false },
