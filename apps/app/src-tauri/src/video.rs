@@ -1,7 +1,29 @@
 // V2.4 虚拟形象视频：独立窗口；只显示本地 Live2D/图片，不采集摄像头、不录像。
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 
 const CALL_LABEL: &str = "video_call";
+const PET_LABEL: &str = "pet";
+static PET_WAS_VISIBLE: AtomicBool = AtomicBool::new(false);
+
+fn hide_pet_for_call(app: &AppHandle) {
+    if let Some(pet) = app.get_webview_window(PET_LABEL) {
+        let visible = pet.is_visible().unwrap_or(false);
+        PET_WAS_VISIBLE.store(visible, Ordering::SeqCst);
+        if visible {
+            let _ = pet.hide();
+        }
+    }
+}
+
+pub fn restore_pet_after_call(app: &AppHandle) {
+    if PET_WAS_VISIBLE.swap(false, Ordering::SeqCst) {
+        if let Some(pet) = app.get_webview_window(PET_LABEL) {
+            let _ = pet.show();
+        }
+    }
+}
 
 #[tauri::command]
 pub async fn video_call_open(app: AppHandle) -> Result<bool, String> {
@@ -11,16 +33,22 @@ pub async fn video_call_open(app: AppHandle) -> Result<bool, String> {
         return Ok(true);
     }
 
-    WebviewWindowBuilder::new(&app, CALL_LABEL, WebviewUrl::App("call.html".into()))
-        .title("和 ta 视频")
-        .inner_size(760.0, 600.0)
-        .min_inner_size(560.0, 460.0)
-        .resizable(true)
-        .decorations(true)
-        .center()
-        .visible(true)
-        .build()
-        .map_err(|error| error.to_string())?;
+    hide_pet_for_call(&app);
+
+    if let Err(error) =
+        WebviewWindowBuilder::new(&app, CALL_LABEL, WebviewUrl::App("call.html".into()))
+            .title("和 ta 视频")
+            .inner_size(760.0, 600.0)
+            .min_inner_size(560.0, 460.0)
+            .resizable(true)
+            .decorations(true)
+            .center()
+            .visible(true)
+            .build()
+    {
+        restore_pet_after_call(&app);
+        return Err(error.to_string());
+    }
     Ok(true)
 }
 
@@ -29,6 +57,7 @@ pub async fn video_call_close(app: AppHandle) -> Result<bool, String> {
     if let Some(window) = app.get_webview_window(CALL_LABEL) {
         window.close().map_err(|error| error.to_string())?;
     }
+    restore_pet_after_call(&app);
     if let Some(main) = app.get_webview_window("main") {
         let _ = main.show();
         let _ = main.set_focus();

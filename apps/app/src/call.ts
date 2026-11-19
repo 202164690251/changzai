@@ -7,7 +7,9 @@ interface CallState {
   version?: number;
   name?: string;
   avatar?: string | null;
+  petImage?: string | null;
   conversationId?: string | null;
+  fallbackConversationId?: string | null;
   text?: string;
   voice?: VoiceSettings;
 }
@@ -78,11 +80,17 @@ async function main(): Promise<void> {
         name,
         avatar: state.avatar ?? null,
         conversationId: state.conversationId ?? null,
+        fallbackConversationId: state.fallbackConversationId ?? null,
+        petImage: state.petImage ?? null,
         canvasSize: 420,
       },
       { host, image, fallback },
     );
-    statusEl.textContent = session.kind === "live2d" ? "形象已就绪 · 等待接通" : "头像已就绪 · 等待接通";
+    statusEl.textContent =
+      session.kind === "live2d"
+        ? "Live2D 已就绪 · 等待接通"
+        : `头像已就绪 · 等待接通${session.warning ? `（${session.warning}）` : ""}`;
+    if (session.warning) showError(session.warning);
   } catch (error) {
     showError(`形象加载失败：${error instanceof Error ? error.message : String(error)}`);
     fallback.textContent = name.slice(0, 1) || "ta";

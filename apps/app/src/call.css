@@ -9,6 +9,15 @@
   box-sizing: border-box;
 }
 
+/* 作者样式里的 display 会覆盖 hidden 属性，必须显式关掉 */
+.call-avatar[hidden],
+.call-image[hidden],
+.call-fallback[hidden],
+.call-accept[hidden],
+.call-error[hidden] {
+  display: none !important;
+}
+
 body {
   margin: 0;
   min-width: 100vw;
