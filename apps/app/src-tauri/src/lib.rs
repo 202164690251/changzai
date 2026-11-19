@@ -115,6 +115,8 @@ pub fn run() {
             pet::pet_set_mini,
             pet::pet_set_chat_open,
             pet::pet_get_mini,
+            pet::pet_get_layout,
+            pet::pet_set_layout,
             video::video_call_open,
             video::video_call_close,
             video::video_call_is_open,

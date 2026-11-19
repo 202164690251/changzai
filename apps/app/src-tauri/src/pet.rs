@@ -5,6 +5,10 @@ use tauri::{AppHandle, Emitter, LogicalSize, Manager, WebviewUrl, WebviewWindow,
 const PET_LABEL: &str = "pet";
 const POSITION_KEY: &str = "pet.position";
 const MINI_KEY: &str = "pet.mini";
+const SIZE_KEY: &str = "pet.size";
+const CHAT_KEY: &str = "pet.chat_open";
+const MIN_STAGE: f64 = 140.0;
+const MAX_STAGE: f64 = 480.0;
 
 #[derive(Debug, Clone, Deserialize)]
 struct SavedPosition {
@@ -16,6 +20,35 @@ fn read_position(app: &AppHandle) -> Option<SavedPosition> {
     let dir = crate::store::app_dir(app).ok()?;
     let raw = crate::store::read_setting_at(&dir, POSITION_KEY).ok()??;
     serde_json::from_str(&raw).ok()
+}
+
+fn read_size(app: &AppHandle) -> f64 {
+    crate::store::app_dir(app)
+        .ok()
+        .and_then(|dir| crate::store::read_setting_at(&dir, SIZE_KEY).ok().flatten())
+        .and_then(|value| value.parse::<f64>().ok())
+        .unwrap_or(240.0)
+        .clamp(MIN_STAGE, MAX_STAGE)
+}
+
+fn write_size(app: &AppHandle, size: f64) -> Result<(), String> {
+    let dir = crate::store::app_dir(app)?;
+    crate::store::write_setting_at(&dir, SIZE_KEY, &format!("{size:.0}"))
+}
+
+fn layout_for(size: f64, chat_open: bool) -> (f64, f64) {
+    let stage = size.clamp(MIN_STAGE, MAX_STAGE);
+    // 下方名字/状态固定；聊天面板固定 280px 宽，窗口只加高。
+    let width = (stage + 48.0).max(320.0);
+    let height = stage + if chat_open { 200.0 } else { 110.0 };
+    (width, height)
+}
+
+fn apply_layout(window: &WebviewWindow, size: f64, chat_open: bool) -> Result<(), String> {
+    let (width, height) = layout_for(size, chat_open);
+    window
+        .set_size(LogicalSize::new(width, height))
+        .map_err(|error| error.to_string())
 }
 
 fn read_mini(app: &AppHandle) -> bool {
@@ -58,9 +91,11 @@ pub(crate) fn open(app: &AppHandle) -> Result<bool, String> {
         return Ok(true);
     }
 
+    let initial_size = read_size(app);
+    let (initial_width, initial_height) = layout_for(initial_size, false);
     let mut builder = WebviewWindowBuilder::new(app, PET_LABEL, WebviewUrl::App("pet.html".into()))
         .title("常在桌宠")
-        .inner_size(if read_mini(app) { 250.0 } else { 280.0 }, if read_mini(app) { 210.0 } else { 300.0 })
+        .inner_size(initial_width, initial_height)
         .decorations(false)
         .transparent(true)
         .always_on_top(true)
@@ -146,13 +181,47 @@ pub fn pet_send_text(app: AppHandle, text: String) -> Result<bool, String> {
 
 #[tauri::command]
 pub fn pet_set_mini(app: AppHandle, window: WebviewWindow, mini: bool) -> Result<bool, String> {
-    let size = if mini {
-        LogicalSize::new(250.0, 210.0)
-    } else {
-        LogicalSize::new(280.0, 300.0)
-    };
-    window.set_size(size).map_err(|error| error.to_string())?;
     write_mini(&app, mini)?;
+    apply_layout(&window, read_size(&app), false)?;
+    Ok(true)
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PetLayout {
+    size: f64,
+    chat_open: bool,
+}
+
+#[tauri::command]
+pub fn pet_get_layout(app: AppHandle) -> PetLayout {
+    let dir = crate::store::app_dir(&app).ok();
+    let chat_open = dir
+        .as_ref()
+        .and_then(|dir| crate::store::read_setting_at(dir, CHAT_KEY).ok().flatten())
+        .map(|value| value == "1")
+        .unwrap_or(false);
+    PetLayout {
+        size: read_size(&app),
+        chat_open,
+    }
+}
+
+#[tauri::command]
+pub fn pet_set_layout(
+    app: AppHandle,
+    window: WebviewWindow,
+    size: f64,
+    chat_open: bool,
+    persist: Option<bool>,
+) -> Result<bool, String> {
+    let clamped = size.clamp(MIN_STAGE, MAX_STAGE);
+    apply_layout(&window, clamped, chat_open)?;
+    if persist.unwrap_or(true) {
+        write_size(&app, clamped)?;
+        let dir = crate::store::app_dir(&app)?;
+        crate::store::write_setting_at(&dir, CHAT_KEY, if chat_open { "1" } else { "0" })?;
+    }
     Ok(true)
 }
 
@@ -163,15 +232,9 @@ pub fn pet_get_mini(app: AppHandle) -> bool {
 
 #[tauri::command]
 pub fn pet_set_chat_open(app: AppHandle, window: WebviewWindow, open: bool) -> Result<bool, String> {
-    if read_mini(&app) {
-        return Ok(false);
-    }
-    let size = if open {
-        LogicalSize::new(280.0, 390.0)
-    } else {
-        LogicalSize::new(280.0, 300.0)
-    };
-    window.set_size(size).map_err(|error| error.to_string())?;
+    apply_layout(&window, read_size(&app), open)?;
+    let dir = crate::store::app_dir(&app)?;
+    crate::store::write_setting_at(&dir, CHAT_KEY, if open { "1" } else { "0" })?;
     Ok(true)
 }
 

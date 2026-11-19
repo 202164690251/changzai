@@ -38,11 +38,17 @@ if (!root || !stage || !image || !fallback || !nameEl || !statusEl || !bubble ||
 }
 
 const LINES = ["在呢", "怎么啦？", "我在这儿", "嗯？", "想我啦？", "来啦来啦"];
+const LIVE2D_CANVAS = 480;
 let lastTs = 0;
 let bubbleTimer: number | null = null;
 let menuOpen = false;
-let mini = false;
 let chatOpen = false;
+let stageSize = 240;
+let resizing = false;
+let resizeStartX = 0;
+let resizeStartY = 0;
+let resizeStartSize = 240;
+let layoutTimer = 0;
 let live2dHandle: {
   destroy: () => void;
   resize: () => void;
@@ -85,7 +91,7 @@ async function syncLive2D(state: PetState): Promise<void> {
   try {
     const module = await import("./lib/live2d.ts");
     const handle = await Promise.race([
-      module.mountLive2D(live2dHost, id),
+      module.mountLive2D(live2dHost, id, LIVE2D_CANVAS),
       new Promise<null>((resolve) => window.setTimeout(() => resolve(null), 15000)),
     ]);
     live2dChecked = id;
@@ -241,11 +247,30 @@ function applyReminder(reminder: boolean | undefined): void {
   lastReminder = next;
 }
 
+function syncLayout(persist = true): void {
+  void invoke("pet_set_layout", { size: stageSize, chatOpen, persist }).catch(() => undefined);
+}
+
+function scheduleLayout(): void {
+  if (layoutTimer !== 0) return;
+  layoutTimer = window.setTimeout(() => {
+    layoutTimer = 0;
+    syncLayout(false);
+  }, 60);
+}
+
+function applyStageSize(next: number, persist = true): void {
+  const maxStage = Math.max(180, Math.min(480, window.screen.availWidth - 80, window.screen.availHeight - 230));
+  stageSize = Math.max(140, Math.min(maxStage, Math.round(next)));
+  document.documentElement.style.setProperty("--pet-size", `${stageSize}px`);
+  live2dHandle?.resize();
+  if (persist) syncLayout();
+}
+
 function setChatOpen(next: boolean): void {
-  if (mini) return;
   chatOpen = next;
   panel.hidden = !next;
-  void invoke("pet_set_chat_open", { open: next }).catch(() => undefined);
+  syncLayout();
   if (next) window.setTimeout(() => input.focus(), 60);
 }
 
@@ -301,27 +326,10 @@ function applyState(): void {
   }
 }
 
-function applyMiniClass(): void {
-  document.body.classList.toggle("is-mini", mini);
-  const button = menu.querySelector<HTMLButtonElement>('[data-action="mini"]');
-  if (button) button.textContent = mini ? "完整模式" : "Mini 模式";
-  panel.hidden = mini || !chatOpen;
+function applyMenuLabels(): void {
   const autoButton = menu.querySelector<HTMLButtonElement>('[data-action="auto"]');
   if (autoButton) autoButton.textContent = `自动动效：${autoLive2D ? "开" : "关"}`;
   live2dHandle?.resize();
-}
-
-async function toggleMini(): Promise<void> {
-  mini = !mini;
-  chatOpen = false;
-  panel.hidden = true;
-  try {
-    await invoke("pet_set_mini", { mini });
-  } catch {
-    /* 窗口大小失败时只切样式 */
-  }
-  applyMiniClass();
-  showBubble(mini ? "缩小啦" : "我回来啦");
 }
 
 async function sendText(text: string): Promise<void> {
@@ -402,6 +410,7 @@ quick.addEventListener("click", (event) => {
 
 stage.addEventListener("mousedown", (event) => {
   if (event.button !== 0) return;
+  if ((event.target as HTMLElement).closest(".pet-resize")) return;
   hideMenu();
   pointerDown = true;
   dragStarted = false;
@@ -415,13 +424,13 @@ stage.addEventListener("mousemove", (event) => {
   const rect = stage.getBoundingClientRect();
   if (rect.width <= 0 || rect.height <= 0) return;
   live2dHandle.focus(
-    ((event.clientX - rect.left) / rect.width) * 200,
-    ((event.clientY - rect.top) / rect.height) * 200,
+    ((event.clientX - rect.left) / rect.width) * LIVE2D_CANVAS,
+    ((event.clientY - rect.top) / rect.height) * LIVE2D_CANVAS,
   );
 });
 
 window.addEventListener("mousemove", (event) => {
-  if (!pointerDown || dragStarted) return;
+  if (resizing || !pointerDown || dragStarted) return;
   if (Math.hypot(event.screenX - downX, event.screenY - downY) < 5) return;
   dragStarted = true;
   suppressClick = true;
@@ -430,7 +439,7 @@ window.addEventListener("mousemove", (event) => {
 });
 
 window.addEventListener("mouseup", () => {
-  if (menuOpen) return;
+  if (menuOpen || resizing) return;
   pointerDown = false;
   if (behaviorState === "dragging") {
     setBehavior(canSleep() ? "sleeping" : "idle");
@@ -441,14 +450,14 @@ window.addEventListener("mouseup", () => {
 function clickZone(event: MouseEvent): "head" | "body" {
   const rect = stage.getBoundingClientRect();
   if (rect.width <= 0 || rect.height <= 0) return "body";
-  const x = ((event.clientX - rect.left) / rect.width) * 200;
-  const y = ((event.clientY - rect.top) / rect.height) * 200;
+  const x = ((event.clientX - rect.left) / rect.width) * LIVE2D_CANVAS;
+  const y = ((event.clientY - rect.top) / rect.height) * LIVE2D_CANVAS;
   if (live2dHandle) {
     const hits = live2dHandle.hitTest(x, y);
     if (hits.some((hit: string) => /head|face/i.test(hit))) return "head";
     if (hits.length > 0) return "body";
   }
-  return y < 200 * 0.35 ? "head" : "body";
+  return y < LIVE2D_CANVAS * 0.35 ? "head" : "body";
 }
 
 stage.addEventListener("click", (event) => {
@@ -467,10 +476,6 @@ stage.addEventListener("click", (event) => {
     return;
   }
   onPoke();
-  if (mini) {
-    live2dHandle?.tap();
-    return;
-  }
   setChatOpen(!chatOpen);
 });
 
@@ -584,7 +589,6 @@ menu.addEventListener("click", (event) => {
     stage.classList.add("is-patting");
     showBubble("嘿嘿，摸头会害羞的");
   } else if (action === "feed") showBubble("好吃！再来一口");
-  else if (action === "mini") void toggleMini();
   else if (action === "hide") void invoke("pet_hide");
   else if (action === "close") void invoke("pet_close");
 });
@@ -592,7 +596,7 @@ menu.addEventListener("click", (event) => {
 window.addEventListener("storage", (event) => {
   if (event.key === "pet.live2d.auto") {
     autoLive2D = localStorage.getItem("pet.live2d.auto") !== "0";
-    applyMiniClass();
+    applyMenuLabels();
   }
   if (event.key === "pet.activity") {
     const saved = localStorage.getItem("pet.activity");
@@ -664,11 +668,45 @@ window.setInterval(() => {
 
 window.addEventListener("blur", hideMenu);
 
-void invoke<boolean>("pet_get_mini")
-  .then((value) => {
-    mini = value;
-    applyMiniClass();
+void invoke<{ size: number; chatOpen: boolean }>("pet_get_layout")
+  .then((layout) => {
+    stageSize = Number.isFinite(layout.size) ? layout.size : 240;
+    applyStageSize(stageSize, false);
+    if (layout.chatOpen) {
+      chatOpen = true;
+      panel.hidden = false;
+    }
+    syncLayout(false);
   })
-  .catch(() => undefined);
+  .catch(() => applyStageSize(stageSize, false));
+
+// 右下角拖拽调整桌宠大小；下方名称/状态/聊天宽度保持固定
+const resizeHandle = document.getElementById("pet-resize") as HTMLElement;
+resizeHandle.addEventListener("pointerdown", (event) => {
+  if (event.button !== 0) return;
+  event.preventDefault();
+  event.stopPropagation();
+  resizing = true;
+  suppressClick = true;
+  resizeStartX = event.screenX;
+  resizeStartY = event.screenY;
+  resizeStartSize = stageSize;
+  resizeHandle.setPointerCapture(event.pointerId);
+  document.body.classList.add("is-resizing");
+});
+
+window.addEventListener("pointermove", (event) => {
+  if (!resizing) return;
+  const delta = (event.screenX - resizeStartX + event.screenY - resizeStartY) / 2;
+  applyStageSize(resizeStartSize + delta, false);
+  scheduleLayout();
+});
+
+window.addEventListener("pointerup", () => {
+  if (!resizing) return;
+  resizing = false;
+  document.body.classList.remove("is-resizing");
+  syncLayout();
+});
 
 applyState();
