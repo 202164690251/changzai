@@ -248,6 +248,18 @@ export async function mountLive2D(
       { autoInteract: false },
     );
     app.stage.addChild(model);
+    // 大肥鱼公皮里 Part46 是一个黑色方块占位（VTube Studio 默认不显示），
+    // 通用渲染会把它画在鼻子位置；按模型路径做兼容隐藏。
+    if (/大肥鱼|DeepSeek/i.test(stored.modelPath)) {
+      try {
+        const core = model.internalModel.coreModel as unknown as {
+          setPartOpacityById?: (id: string, opacity: number) => void;
+        };
+        core.setPartOpacityById?.("Part46", 0);
+      } catch {
+        /* 忽略 */
+      }
+    }
     fit();
   } catch (error) {
     app.destroy(true);
