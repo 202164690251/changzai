@@ -49,6 +49,7 @@ let live2dHandle: {
   tap: () => void;
   motions: string[];
   expressions: number;
+  expressionNames: string[];
   playMotion: (group: string) => void;
   playExpression: (index: number) => void;
   setTalking: (talking: boolean) => void;
@@ -526,7 +527,7 @@ function openActionPanel(): void {
     title.textContent = "表情";
     actionList.appendChild(title);
     for (let index = 0; index < live2dHandle.expressions; index += 1) {
-      addButton(`表情 ${index + 1}`, () => live2dHandle?.playExpression(index));
+      addButton(live2dHandle.expressionNames[index] ?? `表情 ${index + 1}`, () => live2dHandle?.playExpression(index));
     }
   }
   if (actionList.childElementCount === 0) {
@@ -555,8 +556,9 @@ function randomExpression(): void {
     showBubble("这个模型没有表情");
     return;
   }
-  live2dHandle.playExpression(Math.floor(Math.random() * live2dHandle.expressions));
-  showBubble("换了个表情");
+  const index = Math.floor(Math.random() * live2dHandle.expressions);
+  live2dHandle.playExpression(index);
+  showBubble(live2dHandle.expressionNames[index] ?? "换了个表情");
 }
 
 function toggleAuto(): void {
@@ -651,7 +653,12 @@ window.setInterval(() => {
   const group = playful && Math.random() < 0.22 ? playful : idle;
   if (group) live2dHandle.playMotion(group);
   if (live2dHandle.expressions > 0 && Math.random() < 0.3) {
-    live2dHandle.playExpression(Math.floor(Math.random() * live2dHandle.expressions));
+    const facial = live2dHandle.expressionNames
+      .map((name, index) => ({ name, index }))
+      .filter(({ name }) => !/体型|衣服|鞋|眼镜|尾巴|裙子|钢盆|胸口|前倾|加载/i.test(name));
+    const pool = facial.length > 0 ? facial : live2dHandle.expressionNames.map((name, index) => ({ name, index }));
+    const picked = pool[Math.floor(Math.random() * pool.length)];
+    if (picked) live2dHandle.playExpression(picked.index);
   }
 }, 1000);
 

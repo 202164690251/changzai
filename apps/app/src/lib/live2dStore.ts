@@ -57,8 +57,6 @@ export async function saveLive2D(
   chosenModelPath?: string,
 ): Promise<StoredLive2D> {
   const files = Array.from(selected);
-  const total = files.reduce((sum, file) => sum + file.size, 0);
-  if (total > 60 * 1024 * 1024) throw new Error("模型文件夹需要小于 60MB");
   const modelPath = chosenModelPath ?? listLive2DModels(files)[0];
   if (!modelPath) throw new Error("没有找到 .model3.json；请选择完整模型文件夹");
   const modelFile = files.find((file) => relativePath(file) === modelPath);
@@ -71,6 +69,9 @@ export async function saveLive2D(
     // 只保存运行时资源，忽略 PSD/cmo3/can3/ReadMe 等大文件
     if (path === modelPath || runtimeFile.test(path)) map[path] = file;
   }
+  const total = Object.values(map).reduce((sum, file) => sum + file.size, 0);
+  // 4096 贴图 + moc3 的大模型（如大肥鱼）运行时约 60MB+；PSD 已在上面过滤掉。
+  if (total > 120 * 1024 * 1024) throw new Error("模型运行时资源需要小于 120MB");
   const entry = JSON.parse(await modelFile.text()) as { FileReferences?: { Moc?: string; Textures?: string[] } };
   const refs = entry.FileReferences ?? {};
   const resolve = (ref: string): string => {
