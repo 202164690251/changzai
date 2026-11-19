@@ -363,7 +363,7 @@ export function SettingsDrawer({
               <h3 id="settings-pet">桌宠（V2.4）</h3>
             </header>
             <p className="settings-hint">
-              透明小窗，点头部可互动，点身体打开快捷聊天，双击打开主界面；右键动作/表情/互动。默认关闭。
+              透明小窗，点头部可互动，点身体打开快捷聊天，双击打开主界面；鼠标在桌宠上滚动滚轮缩放；右键动作/表情/互动。默认关闭。
             </p>
             <div className="media-actions">
               <button type="button" className="btn primary" onClick={onTogglePet}>
